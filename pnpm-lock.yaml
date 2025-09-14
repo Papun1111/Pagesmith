@@ -20,9 +20,15 @@ importers:
 
   apps/api:
     dependencies:
+      '@clerk/backend':
+        specifier: ^2.14.0
+        version: 2.14.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@clerk/clerk-sdk-node':
         specifier: ^5.1.6
         version: 5.1.6(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@clerk/express':
+        specifier: ^1.7.31
+        version: 1.7.31(express@5.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@google/generative-ai':
         specifier: ^0.24.1
         version: 0.24.1
@@ -261,6 +267,12 @@ packages:
     resolution: {integrity: sha512-KeF5p0XP0gNoCx+YIHrfrkNNADBz8ZabwPAhOiJZ9Wo14r93WlzRA51IE0Qgteej8IpWwnvKu4/MpiV7FFoLqA==}
     engines: {node: '>=18.17.0'}
     deprecated: 'January 10 2025 marks the end of support for @clerk/clerk-sdk-node as previously announced in our October 2024 deprecation notice. Express users can migrate to the @clerk/express package. For more information, you can find our changelog here: https://clerk.com/changelog/2025-01-10-node-sdk-eol'
+
+  '@clerk/express@1.7.31':
+    resolution: {integrity: sha512-qG2eoPKxWPwjPjMv3nJtZt+dZpryVsAfpLY7zFkCDC68U/JLjNwEfZQP6CFMgMHDlqHSJX01H1ItciHJPdTM3A==}
+    engines: {node: '>=18.17.0'}
+    peerDependencies:
+      express: ^4.17.0 || ^5.0.0
 
   '@clerk/nextjs@6.32.0':
     resolution: {integrity: sha512-K35+Fxfe7F/VJCZQkpgMj2VCy020vqYIi0FQRtLcu7MsCAbllyHVj9lss1lx6oh3NjOOGpRe6EN71pO9wgqu+w==}
@@ -2849,6 +2861,17 @@ snapshots:
       - react
       - react-dom
       - svix
+
+  '@clerk/express@1.7.31(express@5.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
+    dependencies:
+      '@clerk/backend': 2.14.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@clerk/shared': 3.25.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@clerk/types': 4.86.0
+      express: 5.1.0
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - react
+      - react-dom
 
   '@clerk/nextjs@6.32.0(next@15.5.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
     dependencies:
