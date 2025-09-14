@@ -17,7 +17,7 @@ coverage
 
 # Turbo
 .turbo
-
+.env
 # Vercel
 .vercel
 
