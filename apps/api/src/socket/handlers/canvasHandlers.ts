@@ -22,11 +22,6 @@ export const registerCanvasHandlers = (io: Server, socket: AuthenticatedSocket) 
     return;
   }
 
-  /**
-   * Handles a user joining a specific canvas room.
-   * A "room" is a private channel for a specific canvas, ensuring that broadcasts
-   * only go to clients viewing the same document.
-   */
   const joinCanvas = (canvasId: string) => {
     socket.join(canvasId);
     logger.info(`User ${userId} joined canvas room: ${canvasId}`);
@@ -34,11 +29,7 @@ export const registerCanvasHandlers = (io: Server, socket: AuthenticatedSocket) 
     // socket.to(canvasId).emit('user-joined', { userId });
   };
 
-  /**
-   * Handles incoming content updates from a client.
-   * It verifies the user has write permissions before broadcasting the changes
-   * to all other clients in the same canvas room.
-   */
+
   const handleCanvasUpdate = async ({ canvasId, content }: { canvasId: string, content: string }) => {
     try {
       // Security Check: Verify the user has permission to write to this canvas.
@@ -57,13 +48,9 @@ export const registerCanvasHandlers = (io: Server, socket: AuthenticatedSocket) 
         return;
       }
 
-      // Broadcast the update to all OTHER clients in the room.
-      // `socket.to(room)` sends to everyone except the originating socket.
+
       socket.to(canvasId).emit('canvas-updated', content);
       
-      // Optional: You could also save the content to the database here,
-      // but it's often better to do that via a debounced REST API call from the client
-      // to avoid overwhelming the database with every keystroke.
 
     } catch (error) {
       logger.error('Error handling canvas update:', error);

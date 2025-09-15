@@ -1,27 +1,20 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
-import { createClerkClient } from '@clerk/backend';
+import { verifyToken } from '@clerk/backend';
 import { registerCanvasHandlers } from './handlers/canvasHandlers.js';
 import { logger } from '../utils/logger.js';
 
-// Ensure the Clerk secret key is provided, otherwise the application cannot function.
-if (!process.env.CLERK_SECRET_KEY) {
-  throw new Error("CLERK_SECRET_KEY is not defined in the environment variables.");
+// Ensure the Clerk JWT key is provided for networkless verification.
+if (!process.env.CLERK_JWT_KEY) {
+  throw new Error("CLERK_JWT_KEY is not defined in the environment variables. Please add it from your Clerk Dashboard.");
 }
-
-// Initialize the Clerk client using your secret key from environment variables.
-const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 // Extend the base Socket type to include our custom userId property.
 interface AuthenticatedSocket extends Socket {
   userId?: string;
 }
 
-/**
- * Initializes the Socket.IO server, attaching it to the provided HTTP server.
- * It sets up a crucial authentication middleware for all incoming WebSocket connections.
- * @param httpServer The Node.js HTTP server instance to attach Socket.IO to.
- */
+
 export const initializeSocketIO = (httpServer: HttpServer) => {
   const io = new Server(httpServer, {
     cors: {
@@ -30,10 +23,8 @@ export const initializeSocketIO = (httpServer: HttpServer) => {
     },
   });
 
-  // --- WebSocket Authentication Middleware ---
-  // This middleware runs for every new connecting client.
   io.use(async (socket: AuthenticatedSocket, next) => {
-    // The client must send their session token in the 'auth' object during connection.
+   
     const token = socket.handshake.auth.token;
 
     if (!token) {
@@ -42,11 +33,12 @@ export const initializeSocketIO = (httpServer: HttpServer) => {
     }
 
     try {
-      // FIX: Use the 'tokens' namespace to access the verifyToken method.
-      const claims = await clerkClient.clients.verifyClient(token);
-      // The 'sub' (subject) claim in the JWT corresponds to the Clerk User ID.
-      // We attach the userId to the socket object for use in our event handlers.
-      socket.userId = claims.id;
+      // Use the standalone verifyToken function with the JWT public key for fast, networkless verification.
+      const claims = await verifyToken(token, {
+        jwtKey: process.env.CLERK_JWT_KEY??"",
+      });
+
+      socket.userId = claims.sub;
       next(); // Authentication successful, allow connection.
     } catch (error) {
       logger.error('Socket connection rejected: Invalid token.', error);
@@ -54,8 +46,7 @@ export const initializeSocketIO = (httpServer: HttpServer) => {
     }
   });
 
-  // --- Main Connection Handler ---
-  // This logic runs after a client has been successfully authenticated.
+  
   io.on('connection', (socket: AuthenticatedSocket) => {
     logger.info(`User connected via WebSocket: ${socket.userId} (Socket ID: ${socket.id})`);
 
