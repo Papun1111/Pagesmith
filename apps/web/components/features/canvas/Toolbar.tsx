@@ -6,41 +6,41 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import type { Canvas } from '@/types';
+import { toast } from 'sonner';
+import { ShareDialog } from './ShareDialog';
 
 // Define the props for the Toolbar component.
-// This interface explicitly states that the component expects a `canvas` object,
-// which resolves the original TypeScript error.
+// It now includes `onCanvasUpdate` to allow this component to notify its
+// parent (CanvasPage) when the canvas data has changed (e.g., after sharing).
 interface ToolbarProps {
   canvas: Canvas;
+  onCanvasUpdate: (updatedCanvas: Canvas) => void;
 }
 
-export function Toolbar({ canvas }: ToolbarProps) {
+export function Toolbar({ canvas, onCanvasUpdate }: ToolbarProps) {
   const { getToken } = useAuth();
   const [title, setTitle] = useState(canvas.title);
   const [isEditing, setIsEditing] = useState(false);
 
   // Handles the logic to update the canvas title.
   const handleTitleChange = async () => {
-    // No need to make an API call if the title hasn't changed.
     if (title === canvas.title) {
       setIsEditing(false);
       return;
     }
 
     const originalTitle = canvas.title;
-    // Optimistically update the UI while the API call is in progress.
     setIsEditing(false);
 
     try {
       const token = await getToken();
       if (!token) throw new Error("Authentication failed. Please sign in.");
       
-      await apiClient.updateCanvasTitle(canvas._id, title, token);
-      console.log('Canvas title updated successfully!');
-      // Note: In a more complex app, you might use a state manager (like Zustand or Jotai)
-      // to update the canvas title globally here.
+      const updatedCanvas = await apiClient.updateCanvasTitle(canvas._id, title, token);
+      onCanvasUpdate(updatedCanvas); // Update the state in the parent component.
+      toast.success('Canvas title updated successfully!');
     } catch (error: any) {
-      console.error('Failed to update canvas title:', error.message || 'An unknown error occurred.');
+      toast.error(error.message || 'Failed to update canvas title.');
       // Revert the title back to the original on error.
       setTitle(originalTitle);
     }
@@ -73,8 +73,12 @@ export function Toolbar({ canvas }: ToolbarProps) {
         </h1>
       )}
       <div className="flex-grow" />
-      {/* Add other toolbar buttons here (e.g., Share, Export) */}
-      <Button size="sm" variant="outline">Share</Button>
+      
+      {/* The ShareDialog now wraps the Share button, making it interactive. */}
+      {/* We pass the canvas data and the onCanvasUpdate function down to it. */}
+      <ShareDialog canvas={canvas} onCanvasUpdate={onCanvasUpdate}>
+        <Button size="sm" variant="outline">Share</Button>
+      </ShareDialog>
     </div>
   );
 }

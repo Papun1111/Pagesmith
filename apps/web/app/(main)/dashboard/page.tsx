@@ -9,8 +9,7 @@ import type { Canvas } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, FileText } from 'lucide-react';
-
+import { PlusCircle, FileText, AlertTriangle } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -18,19 +17,21 @@ export default function DashboardPage() {
   const [canvases, setCanvases] = useState<Canvas[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch all of the user's canvases on component mount.
   useEffect(() => {
     const fetchCanvases = async () => {
       setIsLoading(true);
+      setError(null); // Reset error on new fetch
       try {
         const token = await getToken();
         if (!token) throw new Error("Authentication token not found.");
         const userCanvases = await apiClient.getCanvases(token);
         setCanvases(userCanvases);
-      } catch (error) {
-        console.error("Failed to fetch canvases:", error);
-        // You could show a toast notification here for the error.
+      } catch (err: any) {
+        console.error("Failed to fetch canvases:", err);
+        setError(err.message || "Failed to load your canvases. Please try refreshing the page.");
       } finally {
         setIsLoading(false);
       }
@@ -41,17 +42,16 @@ export default function DashboardPage() {
   // Handles the creation of a new canvas.
   const handleCreateNewCanvas = async () => {
     setIsCreating(true);
+    setError(null); // Reset error on new action
     try {
       const token = await getToken();
       if (!token) throw new Error("Authentication failed.");
       const newCanvas = await apiClient.createCanvas({ title: 'Untitled Canvas' }, token);
-      // Redirect the user to the newly created canvas page.
       router.push(`/canvas/${newCanvas._id}`);
-    } catch (error) {
-      console.error("Failed to create new canvas:", error);
-      // Show an alert or toast for the error.
-      alert("Could not create a new canvas. Please try again.");
-      setIsCreating(false);
+    } catch (err: any) {
+      console.error("Failed to create new canvas:", err);
+      setError(err.message || "Could not create a new canvas. Please try again.");
+      setIsCreating(false); // Ensure loading state is turned off on error
     }
   };
 
@@ -64,6 +64,14 @@ export default function DashboardPage() {
           {isCreating ? 'Creating...' : 'Create New Canvas'}
         </Button>
       </div>
+
+      {/* Display a prominent error message if something goes wrong */}
+      {error && (
+        <div className="mb-4 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+          <AlertTriangle className="h-4 w-4" />
+          <p>{error}</p>
+        </div>
+      )}
 
       {isLoading ? (
         // Loading State Skeletons
@@ -94,13 +102,15 @@ export default function DashboardPage() {
           ))}
         </div>
       ) : (
-        // Empty State
-        <div className="text-center py-16 border-2 border-dashed rounded-lg">
-          <h2 className="text-xl font-semibold">No Canvases Yet</h2>
-          <p className="text-muted-foreground mt-2">
-            Click the "Create New Canvas" button to get started.
-          </p>
-        </div>
+        // Empty State (only show if not loading and no error)
+        !error && (
+          <div className="text-center py-16 border-2 border-dashed rounded-lg">
+            <h2 className="text-xl font-semibold">No Canvases Yet</h2>
+            <p className="text-muted-foreground mt-2">
+              Click the "Create New Canvas" button to get started.
+            </p>
+          </div>
+        )
       )}
     </div>
   );
