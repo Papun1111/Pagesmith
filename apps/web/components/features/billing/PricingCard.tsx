@@ -56,7 +56,13 @@ export function PricingCard({ tier }: PricingCardProps) {
 
     } catch (err: any) {
       console.error('Checkout Error:', err);
-      setError(err.message);
+      // FIX: Add specific handling for the "User not found" error to provide
+      // a more helpful message to the user, especially right after sign-up.
+      if (err.message && err.message.includes('User not found')) {
+        setError('Your account is still being set up. Please wait a moment and try again.');
+      } else {
+        setError(err.message);
+      }
       setIsLoading(false);
     }
   };

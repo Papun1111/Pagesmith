@@ -40,9 +40,14 @@ export default function CanvasPage() {
         if (!token) throw new Error('Authentication token not found.');
         const fetchedCanvas = await apiClient.getCanvasById(canvasId, token);
         setCanvas(fetchedCanvas);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to fetch canvas:', err);
-        setError(err.message || 'An unknown error occurred while loading the canvas.');
+        // Updated error handling to be more robust
+        if (err instanceof Error) {
+          setError(err.message || 'An unknown error occurred while loading the canvas.');
+        } else {
+          setError('An unknown error occurred while loading the canvas.');
+        }
       } finally {
         setIsLoading(false);
       }

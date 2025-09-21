@@ -1,25 +1,36 @@
-import  express, { Router }  from 'express';
-import {
-  handleCreateCanvas,
-  handleGetCanvasById,
-  handleUpdateCanvas,
-} from '../controllers/canvasController.js';
+import { Router } from 'express';
+import * as CanvasController from '../controllers/canvasController.js';
 
-const router:Router = express.Router();
+const router:Router = Router();
 
-/**
- * Defines the CRUD routes for canvases.
- * All routes in this module are protected by the `requireAuth` middleware,
- * which is applied in the main `index.ts` server file where these routes are mounted.
- */
+// --- Routes for the collection of canvases ---
 
-// POST /api/canvases - Create a new canvas
-router.post('/', handleCreateCanvas);
+// GET /api/canvases - Fetches all canvases for the authenticated user.
+router.get('/', CanvasController.handleGetCanvases);
 
-// GET /api/canvases/:canvasId - Get a specific canvas by its ID
-router.get('/:canvasId', handleGetCanvasById);
+// POST /api/canvases - Creates a new canvas.
+router.post('/', CanvasController.handleCreateCanvas);
 
-// PUT /api/canvases/:canvasId - Update the content of a specific canvas
-router.put('/:canvasId', handleUpdateCanvas);
+
+// --- Routes for a single, specific canvas ---
+
+// GET /api/canvases/:canvasId - Fetches a single canvas by its ID.
+router.get('/:canvasId', CanvasController.handleGetCanvasById);
+
+// PATCH /api/canvases/:canvasId/title - Updates the title of a specific canvas.
+router.patch('/:canvasId/title', CanvasController.handleUpdateCanvasTitle);
+
+// PATCH /api/canvases/:canvasId/content - Updates the main content of a specific canvas.
+router.patch('/:canvasId/content', CanvasController.handleUpdateCanvasContent);
+
+
+// --- Routes for managing collaborators on a specific canvas ---
+
+// POST /api/canvases/:canvasId/collaborators - Adds a new collaborator to a canvas.
+router.post('/:canvasId/collaborators', CanvasController.handleAddCollaborator);
+
+// DELETE /api/canvases/:canvasId/collaborators/:collaboratorId - Removes a collaborator.
+router.delete('/:canvasId/collaborators/:collaboratorId', CanvasController.handleRemoveCollaborator);
 
 export default router;
+

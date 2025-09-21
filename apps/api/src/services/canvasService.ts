@@ -1,27 +1,23 @@
-import Canvas, { type ICanvas } from '../models/Canvas.js';
+import Canvas, { type ICanvas, AccessTypes } from '../models/Canvas.js';
 import { logger } from '../utils/logger.js';
 import { ApiError } from '../utils/apiError.js';
-import User from '../models/User.js';
+
+// Define the AccessType locally from the imported runtime object.
+// This resolves the import error as we no longer need to import the type directly.
+type AccessType = typeof AccessTypes[keyof typeof AccessTypes];
 
 /**
  * Creates a new canvas for a given user.
- * @param ownerId - The Clerk ID of the user creating the canvas.
- * @param title - The initial title for the canvas.
- * @returns The newly created canvas document.
  */
-export const createCanvas = async (ownerId: string, title?: string): Promise<ICanvas> => {
+export const createNewCanvas = async (ownerId: string, title?: string): Promise<ICanvas> => {
   if (!ownerId) {
     throw new ApiError(400, 'An owner ID is required to create a canvas.');
   }
-
   try {
     const newCanvas = new Canvas({
       ownerId,
       title: title || 'Untitled Canvas',
-      content: '# Start your masterpiece...', 
-      collaborators: [],
     });
-
     await newCanvas.save();
     logger.info(`New canvas created with ID: ${newCanvas._id} by user: ${ownerId}`);
     return newCanvas;
@@ -32,52 +28,92 @@ export const createCanvas = async (ownerId: string, title?: string): Promise<ICa
 };
 
 /**
+ * Finds all canvases owned by or shared with a user.
+ */
+export const findCanvasesByOwner = async (userId: string): Promise<ICanvas[]> => {
+    return Canvas.find({
+        $or: [{ ownerId: userId }, { 'collaborators.userId': userId }],
+    }).sort({ updatedAt: -1 });
+};
+
+/**
  * Finds a canvas by its ID and verifies if a user has permission to view it.
- * @param canvasId - The ID of the canvas.
- * @param userId - The Clerk ID of the user requesting access.
- * @returns The canvas document if found and user has access.
- * @throws ApiError if canvas is not found or user lacks permission.
  */
 export const findCanvasById = async (canvasId: string, userId: string): Promise<ICanvas> => {
   const canvas = await Canvas.findById(canvasId);
-
   if (!canvas) {
     throw new ApiError(404, 'Canvas not found.');
   }
-
   const isOwner = canvas.ownerId === userId;
   const isCollaborator = canvas.collaborators.some(c => c.userId === userId);
-
   if (!isOwner && !isCollaborator) {
     throw new ApiError(403, 'You do not have permission to access this canvas.');
   }
-
   return canvas;
 };
 
 /**
- * Updates the content of a canvas.
- * @param canvasId - The ID of the canvas to update.
- * @param userId - The Clerk ID of the user making the update.
- * @param content - The new markdown content.
- * @returns The updated canvas document.
- * @throws ApiError if the user does not have write permission.
+ * Updates the title of a canvas, checking for user permissions.
+ */
+export const updateCanvasTitle = async (canvasId: string, userId: string, title: string): Promise<ICanvas> => {
+    const canvas = await findCanvasById(canvasId, userId); // Permission check is built-in
+    const hasWritePermission = canvas.ownerId === userId || canvas.collaborators.some(c => c.userId === userId && c.accessType === AccessTypes.WRITE);
+
+    if (!hasWritePermission) {
+        throw new ApiError(403, 'You do not have permission to edit this canvas title.');
+    }
+    canvas.title = title;
+    await canvas.save();
+    return canvas;
+};
+
+/**
+ * Updates the content of a canvas, checking for user permissions.
  */
 export const updateCanvasContent = async (canvasId: string, userId: string, content: string): Promise<ICanvas> => {
     const canvas = await findCanvasById(canvasId, userId); // Permission check is built-in
+    const hasWritePermission = canvas.ownerId === userId || canvas.collaborators.some(c => c.userId === userId && c.accessType === AccessTypes.WRITE);
 
-    const isOwner = canvas.ownerId === userId;
-    // FIX: Aligned permission check with the new Canvas model.
-    // The 'collab' accessType has been removed, so we only check for 'write'.
-    const canWrite = canvas.collaborators.some(
-        c => c.userId === userId && c.accessType === 'write'
-    );
+    if (!hasWritePermission) {
+        throw new ApiError(403, 'You do not have permission to edit this canvas content.');
+    }
+    canvas.content = content;
+    await canvas.save();
+    return canvas;
+};
 
-    if (!isOwner && !canWrite) {
-        throw new ApiError(403, 'You do not have permission to edit this canvas.');
+/**
+ * Adds a collaborator to a canvas. Only the owner can do this.
+ */
+export const addCollaborator = async (canvasId: string, ownerId: string, collaboratorId: string, accessType: AccessType): Promise<ICanvas> => {
+    const canvas = await Canvas.findById(canvasId);
+    if (!canvas) throw new ApiError(404, 'Canvas not found.');
+    if (canvas.ownerId !== ownerId) throw new ApiError(403, 'Only the owner can add collaborators.');
+    if (ownerId === collaboratorId) throw new ApiError(400, 'You cannot add yourself as a collaborator.');
+
+    // Check if collaborator already exists
+    const existingCollaborator = canvas.collaborators.find(c => c.userId === collaboratorId);
+    if (existingCollaborator) {
+        // If they exist, just update their access type
+        existingCollaborator.accessType = accessType;
+    } else {
+        // Otherwise, add them to the array
+        canvas.collaborators.push({ userId: collaboratorId, accessType });
     }
 
-    canvas.content = content;
+    await canvas.save();
+    return canvas;
+};
+
+/**
+ * Removes a collaborator from a canvas. Only the owner can do this.
+ */
+export const removeCollaborator = async (canvasId: string, ownerId: string, collaboratorId: string): Promise<ICanvas> => {
+    const canvas = await Canvas.findById(canvasId);
+    if (!canvas) throw new ApiError(404, 'Canvas not found.');
+    if (canvas.ownerId !== ownerId) throw new ApiError(403, 'Only the owner can remove collaborators.');
+
+    canvas.collaborators = canvas.collaborators.filter(c => c.userId !== collaboratorId);
     await canvas.save();
     return canvas;
 };

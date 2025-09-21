@@ -58,17 +58,26 @@ export const apiClient = {
         body: JSON.stringify({ title }),
     });
   },
+
+  // --- NEW: Function to update the main content of a canvas ---
+  updateCanvasContent: (canvasId: string, content: string, token: string): Promise<Canvas> => {
+    return apiFetch(`/canvases/${canvasId}/content`, token, {
+      method: 'PATCH',
+      body: JSON.stringify({ content }),
+    });
+  },
   
-  // FIX: Add the missing functions for managing collaborators.
-  addCollaborator: (canvasId: string, userId: string, accessType: AccessType, token: string): Promise<Canvas> => {
+  // --- CORRECTED: Function for adding a collaborator ---
+  addCollaborator: (canvasId: string, collaboratorId: string, accessType: AccessType, token: string): Promise<Canvas> => {
     return apiFetch(`/canvases/${canvasId}/collaborators`, token, {
       method: 'POST',
-      body: JSON.stringify({ userId, accessType }),
+      body: JSON.stringify({ collaboratorId, accessType }),
     });
   },
 
-  removeCollaborator: (canvasId: string, userId: string, token: string): Promise<Canvas> => {
-    return apiFetch(`/canvases/${canvasId}/collaborators/${userId}`, token, {
+  // --- CORRECTED: Function for removing a collaborator ---
+  removeCollaborator: (canvasId: string, collaboratorId: string, token: string): Promise<Canvas> => {
+    return apiFetch(`/canvases/${canvasId}/collaborators/${collaboratorId}`, token, {
       method: 'DELETE',
     });
   },

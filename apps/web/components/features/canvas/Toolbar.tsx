@@ -39,10 +39,12 @@ export function Toolbar({ canvas, onCanvasUpdate }: ToolbarProps) {
       const updatedCanvas = await apiClient.updateCanvasTitle(canvas._id, title, token);
       onCanvasUpdate(updatedCanvas); // Update the state in the parent component.
       toast.success('Canvas title updated successfully!');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      if(error instanceof Error){
       toast.error(error.message || 'Failed to update canvas title.');
       // Revert the title back to the original on error.
       setTitle(originalTitle);
+      }
     }
   };
 

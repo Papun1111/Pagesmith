@@ -30,26 +30,32 @@ export function AIAssistantPanel() {
         body: JSON.stringify({ prompt }),
       });
 
+      // If the response is not OK, we need to parse the error message.
       if (!res.ok) {
+        // Try to get a specific error message from the response body first.
         const errorText = await res.text();
+        // Provide a more informative error based on the status code.
+        if (res.status === 401) {
+          throw new Error('Authentication failed. Please ensure you are logged in.');
+        }
         throw new Error(errorText || 'The AI assistant failed to respond.');
       }
 
-      // FIX: Check the Content-Type header before attempting to parse as JSON.
-      // This prevents the "Unexpected token '<'" error if we receive an HTML page.
       const contentType = res.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const data = await res.json();
         setResponse(data.response);
       } else {
-        // If the response is not JSON, something is wrong with the API gateway.
         const errorText = await res.text();
         console.error("Received non-JSON response from AI API:", errorText);
-        throw new Error('Received an invalid response from the AI assistant.');
+        throw new Error('Received an invalid response from the AI assistant. Check the server logs.');
       }
 
-    } catch (err: any) {
+    } catch (err: unknown) {
+      if (err instanceof Error){
+      console.error("AI Assistant Error:", err);
       setError(err.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -84,8 +90,11 @@ export function AIAssistantPanel() {
           {isLoading && <Skeleton className="w-full h-24" />}
           {error && (
             <div className="text-red-500 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              <p className="text-sm">{error}</p>
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <div>
+                <p className="font-semibold">An error occurred:</p>
+                <p className="text-xs">{error}</p>
+              </div>
             </div>
           )}
           {response && <p className="text-sm whitespace-pre-wrap">{response}</p>}

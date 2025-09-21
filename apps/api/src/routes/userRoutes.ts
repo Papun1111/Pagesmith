@@ -1,14 +1,15 @@
 import { Router } from 'express';
-import { clerkWebhookHandler } from '../controllers/userController.js';
+import { clerkWebhookHandler, getUserProfile } from '../controllers/userController.js';
+import { requireAuth } from '../middleware/auth.js';
 
-const router:Router = Router();
+const router :Router= Router();
 
-/**
- * Defines the webhook endpoint for Clerk.
- * This is a public route, but it's secured by Svix signature verification
- * inside the controller. It's crucial that the raw body parser is applied
- * to this route in the main server file.
- */
+// This is an authenticated route to get the user's own profile.
+// It will be accessed at GET /api/user/profile
+router.get('/profile', requireAuth, getUserProfile);
+
+// This is the public webhook route for Clerk.
+// It will be accessed at POST /api/webhooks/clerk
 router.post('/clerk', clerkWebhookHandler);
 
 export default router;

@@ -17,11 +17,11 @@ export function Header() {
               <path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z" />
               <path d="M15 3v6h6" />
             </svg>
-            <span className="font-bold">NotionClone</span>
+            <span className="font-bold">Page-Smith</span>
           </Link>
-          {/* Desktop Navigation */}
+         
           <nav className="hidden md:flex items-center gap-4 text-sm font-medium">
-            <Link href="/" className="text-muted-foreground transition-colors hover:text-foreground">
+            <Link href="/dashboard" className="text-muted-foreground transition-colors hover:text-foreground">
               Dashboard
             </Link>
             <Link href="/pricing" className="text-muted-foreground transition-colors hover:text-foreground">

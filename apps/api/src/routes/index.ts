@@ -2,7 +2,7 @@ import { Router } from 'express';
 import canvasRoutes from './canvasRoutes.js';
 import stripeRoutes from './stripeRoutes.js';
 import geminiRoutes from './geminiRoutes.js';
-import userRoutes from './userRoutes.js'; // Import the new user routes
+import userRoutes from './userRoutes.js';
 
 const router: Router = Router();
 
@@ -10,7 +10,8 @@ const router: Router = Router();
 router.use('/canvases', canvasRoutes);
 router.use('/billing', stripeRoutes);
 router.use('/ai', geminiRoutes);
-router.use('/webhooks', userRoutes); // Mount the user webhook routes
+router.use('/user', userRoutes); // Mount the new user routes for profile fetching
+
+// Note: The webhook route is handled separately in index.ts for raw body parsing.
 
 export default router;
-

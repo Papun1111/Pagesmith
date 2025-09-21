@@ -9,109 +9,145 @@ import type { Canvas } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, FileText, AlertTriangle } from 'lucide-react';
+import { PlusCircle, FileText, AlertTriangle, Users } from 'lucide-react';
+
+// A reusable component to render a grid of canvas cards.
+const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
+  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    {canvases.map((canvas) => (
+      <Link href={`/canvas/${canvas._id}`} key={canvas._id}>
+        <Card className="hover:shadow-md transition-shadow hover:border-primary h-full">
+          <CardHeader>
+            <CardTitle className="truncate flex items-center gap-2">
+              <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <span className="truncate">{canvas.title}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription>
+              Last updated: {new Date(canvas.updatedAt).toLocaleDateString()}
+            </CardDescription>
+          </CardContent>
+        </Card>
+      </Link>
+    ))}
+  </div>
+);
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth(); // Get userId to filter canvases
   const [canvases, setCanvases] = useState<Canvas[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all of the user's canvases on component mount.
   useEffect(() => {
     const fetchCanvases = async () => {
       setIsLoading(true);
-      setError(null); // Reset error on new fetch
+      setError(null);
       try {
         const token = await getToken();
         if (!token) throw new Error("Authentication token not found.");
         const userCanvases = await apiClient.getCanvases(token);
         setCanvases(userCanvases);
-      } catch (err: any) {
+      } catch (err: unknown) {
+if(err instanceof Error){
         console.error("Failed to fetch canvases:", err);
         setError(err.message || "Failed to load your canvases. Please try refreshing the page.");
-      } finally {
+      }} finally {
         setIsLoading(false);
       }
     };
     fetchCanvases();
   }, [getToken]);
 
-  // Handles the creation of a new canvas.
   const handleCreateNewCanvas = async () => {
     setIsCreating(true);
-    setError(null); // Reset error on new action
+    setError(null);
     try {
       const token = await getToken();
       if (!token) throw new Error("Authentication failed.");
       const newCanvas = await apiClient.createCanvas({ title: 'Untitled Canvas' }, token);
       router.push(`/canvas/${newCanvas._id}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      if(err instanceof Error){
       console.error("Failed to create new canvas:", err);
       setError(err.message || "Could not create a new canvas. Please try again.");
-      setIsCreating(false); // Ensure loading state is turned off on error
-    }
+      setIsCreating(false);
+    }}
   };
 
+  // Filter canvases into owned and shared lists.
+  const ownedCanvases = canvases.filter(c => c.ownerId === userId);
+  const sharedCanvases = canvases.filter(c => c.ownerId !== userId);
+
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Your Canvases</h1>
+    <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
         <Button onClick={handleCreateNewCanvas} disabled={isCreating}>
           <PlusCircle className="mr-2 h-4 w-4" />
           {isCreating ? 'Creating...' : 'Create New Canvas'}
         </Button>
       </div>
 
-      {/* Display a prominent error message if something goes wrong */}
       {error && (
-        <div className="mb-4 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-600">
+        <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-600">
           <AlertTriangle className="h-4 w-4" />
           <p>{error}</p>
         </div>
       )}
 
       {isLoading ? (
-        // Loading State Skeletons
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-40 w-full rounded-lg" />
-          ))}
-        </div>
-      ) : canvases.length > 0 ? (
-        // Display Canvases
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {canvases.map((canvas) => (
-            <Link href={`/canvas/${canvas._id}`} key={canvas._id}>
-              <Card className="hover:shadow-md transition-shadow hover:border-primary">
-                <CardHeader>
-                  <CardTitle className="truncate flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                    {canvas.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription>
-                    Last updated: {new Date(canvas.updatedAt).toLocaleDateString()}
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+        <div className="space-y-8">
+          <div>
+            <Skeleton className="h-8 w-48 mb-4" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-40 w-full" />)}
+            </div>
+          </div>
+          <div>
+            <Skeleton className="h-8 w-64 mb-4" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-40 w-full" />)}
+            </div>
+          </div>
         </div>
       ) : (
-        // Empty State (only show if not loading and no error)
-        !error && (
-          <div className="text-center py-16 border-2 border-dashed rounded-lg">
-            <h2 className="text-xl font-semibold">No Canvases Yet</h2>
-            <p className="text-muted-foreground mt-2">
-              Click the "Create New Canvas" button to get started.
-            </p>
+        <div className="space-y-8">
+          {/* My Canvases Section */}
+          <div>
+            <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
+              <FileText className="h-6 w-6" /> My Canvases
+            </h2>
+            {ownedCanvases.length > 0 ? (
+              <CanvasGrid canvases={ownedCanvases} />
+            ) : (
+              <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                <h3 className="text-lg font-semibold">You haven&apos;t created any canvases yet.</h3>
+                <p className="text-muted-foreground mt-1">Click the Create New Canvas button to get started.</p>
+              </div>
+            )}
           </div>
-        )
+
+          {/* Shared With Me Section */}
+          <div>
+            <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
+              <Users className="h-6 w-6" /> Shared With Me
+            </h2>
+            {sharedCanvases.length > 0 ? (
+              <CanvasGrid canvases={sharedCanvases} />
+            ) : (
+              <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                <h3 className="text-lg font-semibold">No canvases have been shared with you.</h3>
+                <p className="text-muted-foreground mt-1">When someone shares a canvas, it will appear here.</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
 }
+

@@ -9,7 +9,7 @@ import { UserButton } from '@clerk/nextjs';
 export function UserProfileButton() {
   return (
     <UserButton
-      afterSignOutUrl="/"
+      showName
       appearance={{
         elements: {
           avatarBox: "h-9 w-9"

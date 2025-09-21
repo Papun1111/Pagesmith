@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
-import { Copy, X } from 'lucide-react';
+import { Copy, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -37,12 +36,23 @@ export function ShareDialog({ children, canvas, onCanvasUpdate }: ShareDialogPro
   const [newCollaboratorId, setNewCollaboratorId] = useState('');
   const [accessType, setAccessType] = useState<AccessType>('read');
   const [isAdding, setIsAdding] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   const handleAddCollaborator = async () => {
     if (!newCollaboratorId.trim()) {
       toast.error('Please enter a User ID.');
       return;
     }
+    // Add validation to prevent adding the owner or an existing collaborator.
+    if (newCollaboratorId === currentUserId) {
+      toast.error("You cannot add yourself as a collaborator.");
+      return;
+    }
+    if (canvas.collaborators.some(c => c.userId === newCollaboratorId)) {
+      toast.error("This user is already a collaborator.");
+      return;
+    }
+
     setIsAdding(true);
     try {
       const token = await getToken();
@@ -52,7 +62,8 @@ export function ShareDialog({ children, canvas, onCanvasUpdate }: ShareDialogPro
       onCanvasUpdate(updatedCanvas); // Update parent state
       toast.success('Collaborator added successfully!');
       setNewCollaboratorId('');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      if(error instanceof Error)
       toast.error(error.message || 'Failed to add collaborator.');
     } finally {
       setIsAdding(false);
@@ -67,34 +78,46 @@ export function ShareDialog({ children, canvas, onCanvasUpdate }: ShareDialogPro
       const updatedCanvas = await apiClient.removeCollaborator(canvas._id, collaboratorId, token);
       onCanvasUpdate(updatedCanvas);
       toast.success('Collaborator removed.');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      if(error instanceof Error)
       toast.error(error.message || 'Failed to remove collaborator.');
     }
   };
   
-  const copyCurrentUserId = () => {
-    if(currentUserId) {
-        navigator.clipboard.writeText(currentUserId);
-        toast.success("Your User ID has been copied to the clipboard.");
+  // Use a more robust copy-to-clipboard method.
+  const copyToClipboard = (text: string) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      toast.success("Your User ID has been copied to the clipboard.");
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000); // Reset visual feedback after 2 seconds
+    } catch (err) {
+      toast.error('Failed to copy ID.');
     }
-  }
+    document.body.removeChild(textArea);
+  };
 
   return (
     <Dialog>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Share "{canvas.title}"</DialogTitle>
+          <DialogTitle>Share {canvas.title}</DialogTitle>
           <DialogDescription>
-            Anyone with the link can view. Invite others to collaborate.
+            Invite others to collaborate by sharing their User ID.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="flex items-center">
             <p className="text-sm text-muted-foreground mr-2">Your User ID (for sharing):</p>
-            <Button onClick={copyCurrentUserId} variant="ghost" size="sm">
-                <Copy className="h-4 w-4 mr-2" />
-                Click to Copy
+            <Button onClick={() => currentUserId && copyToClipboard(currentUserId)} variant="ghost" size="sm" disabled={isCopied}>
+              {isCopied ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <Copy className="h-4 w-4 mr-2" />}
+              {isCopied ? 'Copied!' : 'Copy Your ID'}
             </Button>
           </div>
           <div className="space-y-2">
@@ -124,12 +147,12 @@ export function ShareDialog({ children, canvas, onCanvasUpdate }: ShareDialogPro
             <h4 className="text-sm font-medium">People with Access</h4>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm">Owner ({canvas.ownerId.slice(0, 15)}...)</p>
+                <p className="text-sm truncate" title={canvas.ownerId}>Owner ({canvas.ownerId.slice(0, 15)}...)</p>
                 <p className="text-sm text-muted-foreground">Owner</p>
               </div>
               {canvas.collaborators.map((c) => (
                 <div key={c.userId} className="flex items-center justify-between">
-                  <p className="text-sm">{c.userId.slice(0, 15)}...</p>
+                  <p className="text-sm truncate" title={c.userId}>{c.userId.slice(0, 15)}...</p>
                   <div className="flex items-center gap-2">
                     <p className="text-sm text-muted-foreground">{c.accessType === 'read' ? 'Can view' : 'Can edit'}</p>
                     <Button
@@ -150,3 +173,4 @@ export function ShareDialog({ children, canvas, onCanvasUpdate }: ShareDialogPro
     </Dialog>
   );
 }
+
