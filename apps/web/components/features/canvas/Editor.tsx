@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@clerk/nextjs';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { type Socket } from 'socket.io-client';
-import { toast } from 'sonner';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-import { getSocket, disconnectSocket } from '@/lib/socket';
+import { useSocket } from '@/hooks/useSocket';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardFooter } from '@/components/ui/card';
@@ -19,77 +18,52 @@ interface EditorProps {
 }
 
 /**
- * The main editor component for the canvas. It handles real-time content synchronization
- * between multiple users via WebSockets.
+ * The main editor component for the canvas. It now uses the `useSocket` hook
+ * to manage its real-time connection and provides syntax highlighting.
  */
 export function Editor({ canvasId, initialContent }: EditorProps) {
   const [content, setContent] = useState(initialContent);
-  const [isConnected, setIsConnected] = useState(false);
   
-  const socketRef = useRef<Socket | null>(null);
-  // Use a ref to track if a content change was made by the local user or received from the socket.
-  // This is crucial to prevent the client from echoing updates back to the server.
+  // Use the custom hook to manage the socket connection.
+  // This replaces all the manual connection logic.
+  const { socket, isConnected } = useSocket(canvasId);
+
+  // This ref is crucial to prevent the editor from sending content back to the
+  // server that it just received (an "echo").
   const isLocalChange = useRef(false);
-  
   const debouncedContent = useDebounce(content, 500);
-  const { getToken } = useAuth();
 
-  // Effect to establish and clean up the WebSocket connection.
+  // Effect to listen for incoming content updates from other users.
   useEffect(() => {
-    const connect = async () => {
-      try {
-        const socket = await getSocket(() => getToken());
-        socketRef.current = socket;
+    if (!socket) return;
 
-        socket.on('connect', () => {
-          setIsConnected(true);
-          toast.success("Real-time connection established!");
-          socket.emit('join-canvas', canvasId);
-        });
-
-        socket.on('canvas-updated', (newContent: string) => {
-          // When content is received from the server, flag it as a non-local change.
-          isLocalChange.current = false;
-          setContent(newContent);
-        });
-        
-        socket.on('disconnect', () => {
-          setIsConnected(false);
-          toast.error("Real-time connection lost. Reconnecting...");
-        });
-
-        // Handle connection errors
-        socket.on('connect_error', (err) => {
-            console.error("Socket connection error:", err);
-            toast.error(`Connection failed: ${err.message}`);
-        });
-
-      } catch (error) {
-        console.error("Failed to initialize socket:", error);
-        toast.error("Could not establish real-time connection.");
-      }
+    const handleUpdate = (newContent: string) => {
+      // When we receive an update, we flag that it was not a local change.
+      isLocalChange.current = false;
+      setContent(newContent);
     };
-    
-    connect();
 
-    // Cleanup function: Disconnect the socket when the component unmounts.
+    socket.on('canvas-updated', handleUpdate);
+
+    // Clean up the event listener when the component unmounts or the socket changes.
     return () => {
-      disconnectSocket();
+      socket.off('canvas-updated', handleUpdate);
     };
-  }, [canvasId, getToken]);
+  }, [socket]);
 
-  // Effect to emit content updates when the debounced content changes.
+  // Effect to send local content updates to the server.
   useEffect(() => {
-    // Only emit updates if the socket is connected and the change was made locally.
-    if (isConnected && socketRef.current && isLocalChange.current) {
-      socketRef.current.emit('canvas-update', { canvasId, content: debouncedContent });
-      // Reset the flag after emitting.
+    // We only send an update if the connection is live, the socket exists,
+    // and the change was made by the local user.
+    if (isConnected && socket && isLocalChange.current) {
+      socket.emit('canvas-update', { canvasId, content: debouncedContent });
+      // Reset the flag after sending the update.
       isLocalChange.current = false;
     }
-  }, [debouncedContent, canvasId, isConnected]);
+  }, [debouncedContent, canvasId, isConnected, socket]);
 
   const handleContentChange = (newContent: string) => {
-    // When the user types, flag the change as a local one before updating the state.
+    // When the user types in the textarea, we flag the change as a local one.
     isLocalChange.current = true;
     setContent(newContent);
   }
@@ -101,7 +75,7 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
         <Textarea
           value={content}
           onChange={(e) => handleContentChange(e.target.value)}
-          className="w-full flex-grow p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="w-full flex-grow p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono"
           placeholder="Start typing your markdown..."
         />
         <CardFooter className="py-2 px-4 border-t">
@@ -112,10 +86,33 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
         </CardFooter>
       </Card>
 
-      {/* Preview Pane */}
+      {/* Preview Pane with Syntax Highlighting */}
       <Card className="h-full overflow-y-auto">
         <article className="prose dark:prose-invert max-w-none p-4">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              code(props) {
+                const { children, className, ...rest } = props;
+                const match = /language-(\w+)/.exec(className || '');
+                return match ? (
+                  <SyntaxHighlighter
+                    style={vscDarkPlus}
+                    language={match[1]}
+                    PreTag="div"
+                  >
+                    {String(children).replace(/\n$/, '')}
+                  </SyntaxHighlighter>
+                ) : (
+                  <code {...rest} className={className}>
+                    {children}
+                  </code>
+                );
+              },
+            }}
+          >
+            {content}
+          </ReactMarkdown>
         </article>
       </Card>
     </div>
