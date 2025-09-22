@@ -43,7 +43,6 @@ export function ShareDialog({ children, canvas, onCanvasUpdate }: ShareDialogPro
       toast.error('Please enter a User ID.');
       return;
     }
-    // Add validation to prevent adding the owner or an existing collaborator.
     if (newCollaboratorId === currentUserId) {
       toast.error("You cannot add yourself as a collaborator.");
       return;
@@ -59,7 +58,7 @@ export function ShareDialog({ children, canvas, onCanvasUpdate }: ShareDialogPro
       if (!token) throw new Error('Not authenticated');
 
       const updatedCanvas = await apiClient.addCollaborator(canvas._id, newCollaboratorId, accessType, token);
-      onCanvasUpdate(updatedCanvas); // Update parent state
+      onCanvasUpdate(updatedCanvas);
       toast.success('Collaborator added successfully!');
       setNewCollaboratorId('');
     } catch (error: unknown) {
@@ -84,22 +83,41 @@ export function ShareDialog({ children, canvas, onCanvasUpdate }: ShareDialogPro
     }
   };
   
-  // Use a more robust copy-to-clipboard method.
+  // FIX: Implement a more robust copy-to-clipboard function that tries the modern
+  // navigator.clipboard API first and falls back to the execCommand method.
   const copyToClipboard = (text: string) => {
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    try {
-      document.execCommand('copy');
-      toast.success("Your User ID has been copied to the clipboard.");
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000); // Reset visual feedback after 2 seconds
-    } catch (err) {
-      toast.error('Failed to copy ID.');
+    if (!text) return;
+
+    // Try the modern Clipboard API first
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast.success("Your User ID has been copied to the clipboard.");
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      }).catch(err => {
+        toast.error('Failed to copy ID.');
+        console.error('Clipboard API error:', err);
+      });
+    } else {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'absolute';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        toast.success("Your User ID has been copied to the clipboard.");
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch (err) {
+        toast.error('Failed to copy ID.');
+        console.error('Fallback copy error:', err);
+      }
+      document.body.removeChild(textArea);
     }
-    document.body.removeChild(textArea);
   };
 
   return (
@@ -115,7 +133,7 @@ export function ShareDialog({ children, canvas, onCanvasUpdate }: ShareDialogPro
         <div className="space-y-4 py-4">
           <div className="flex items-center">
             <p className="text-sm text-muted-foreground mr-2">Your User ID (for sharing):</p>
-            <Button onClick={() => currentUserId && copyToClipboard(currentUserId)} variant="ghost" size="sm" disabled={isCopied}>
+            <Button onClick={() => copyToClipboard(currentUserId || '')} variant="ghost" size="sm" disabled={isCopied}>
               {isCopied ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <Copy className="h-4 w-4 mr-2" />}
               {isCopied ? 'Copied!' : 'Copy Your ID'}
             </Button>

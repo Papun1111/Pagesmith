@@ -1,74 +1,37 @@
-import { Server, Socket } from 'socket.io';
-import Canvas from '../../models/Canvas.js'; // Import the Canvas model to check permissions
+import { Server } from 'socket.io';
+import { type AuthenticatedSocket } from '../index.js';
 import { logger } from '../../utils/logger.js';
+import * as CanvasService from '../../services/canvasService.js';
 
-// Interface to add our custom `userId` property to the socket data
-interface AuthenticatedSocket extends Socket {
-  data: {
-    userId?: string;
-  };
-}
-
-/**
- * Registers all event handlers related to canvas collaboration for a given socket connection.
- * @param io - The main Socket.IO server instance.
- * @param socket - The individual client socket connection.
- */
+// This function now receives an `AuthenticatedSocket`, so we can be sure `socket.userId` exists.
 export const registerCanvasHandlers = (io: Server, socket: AuthenticatedSocket) => {
-  const { userId } = socket.data;
+  // FIX: The authentication check is now handled in `socket/index.ts`,
+  // so we can remove the redundant check here, cleaning up the logic.
+  const { userId } = socket;
 
-  if (!userId) {
-    logger.warn('Unauthenticated socket tried to register canvas handlers. This should not happen.');
-    return;
-  }
-
-  const joinCanvas = (canvasId: string) => {
+  // Handler for when a client wants to join a specific canvas room.
+  socket.on('join-canvas', (canvasId: string) => {
     socket.join(canvasId);
     logger.info(`User ${userId} joined canvas room: ${canvasId}`);
-    // Optional: Broadcast to the room that a new user has joined.
-    // socket.to(canvasId).emit('user-joined', { userId });
-  };
+  });
 
-
-  const handleCanvasUpdate = async ({ canvasId, content }: { canvasId: string, content: string }) => {
+  // Handler for when a client sends an update for a canvas's content.
+  socket.on('canvas-update', async ({ canvasId, content }: { canvasId: string, content: string }) => {
     try {
-      // Security Check: Verify the user has permission to write to this canvas.
-      const canvas = await Canvas.findById(canvasId);
-      if (!canvas) {
-        socket.emit('error', { message: 'Canvas not found.' });
-        return;
-      }
-
-      const hasWriteAccess =
-        canvas.ownerId === userId ||
-        canvas.collaborators.some(c => c.userId === userId && c.accessType === 'write');
-
-      if (!hasWriteAccess) {
-        socket.emit('error', { message: 'You do not have permission to edit this canvas.' });
-        return;
-      }
-
-
-      socket.to(canvasId).emit('canvas-updated', content);
+      // Before broadcasting, verify the user has write permission.
+      await CanvasService.updateCanvasContent(canvasId, userId, content);
       
-
-    } catch (error) {
-      logger.error('Error handling canvas update:', error);
-      socket.emit('error', { message: 'An error occurred while updating the canvas.' });
+      // Broadcast the update to all other clients in the same room.
+      socket.to(canvasId).emit('canvas-updated', content);
+    } catch (error: any) {
+      logger.error(`User ${userId} failed to update canvas ${canvasId}:`, error.message);
+      // Optionally, emit an error back to the originating client.
+      socket.emit('update-error', { canvasId, message: error.message });
     }
-  };
+  });
 
-  /**
-   * Handles broadcasting a user's cursor position to other clients in the room
-   * for live presence indicators.
-   */
-  const handleCursorMove = ({ canvasId, cursorPosition }: { canvasId: string, cursorPosition: any }) => {
-    // Broadcast cursor position to other clients in the room.
+  // Handler for broadcasting cursor positions.
+  socket.on('cursor-move', ({ canvasId, cursorPosition }: { canvasId: string, cursorPosition: any }) => {
     socket.to(canvasId).emit('cursor-moved', { userId, position: cursorPosition });
-  };
-
-  // Register the event listeners for this socket.
-  socket.on('join-canvas', joinCanvas);
-  socket.on('canvas-update', handleCanvasUpdate);
-  socket.on('cursor-move', handleCursorMove);
+  });
 };

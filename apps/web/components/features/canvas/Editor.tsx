@@ -5,11 +5,13 @@ import { useAuth } from '@clerk/nextjs';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { type Socket } from 'socket.io-client';
+import { toast } from 'sonner';
 
 import { getSocket, disconnectSocket } from '@/lib/socket';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Textarea } from '@/components/ui/textarea';
-import { Card } from '@/components/ui/card';
+import { Card, CardFooter } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface EditorProps {
   canvasId: string;
@@ -24,41 +26,47 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
   const [content, setContent] = useState(initialContent);
   const [isConnected, setIsConnected] = useState(false);
   
-  // Use a ref to hold the socket instance to prevent re-renders from re-initializing it.
   const socketRef = useRef<Socket | null>(null);
+  // Use a ref to track if a content change was made by the local user or received from the socket.
+  // This is crucial to prevent the client from echoing updates back to the server.
+  const isLocalChange = useRef(false);
   
-  // Debounce the content to avoid sending too many updates to the server.
   const debouncedContent = useDebounce(content, 500);
-  
   const { getToken } = useAuth();
 
   // Effect to establish and clean up the WebSocket connection.
   useEffect(() => {
-    let socket: Socket;
-
     const connect = async () => {
       try {
-        // Get the socket instance using our singleton initializer.
-        socket = await getSocket(() => getToken());
+        const socket = await getSocket(() => getToken());
         socketRef.current = socket;
 
         socket.on('connect', () => {
           setIsConnected(true);
-          // Join the specific room for this canvas.
+          toast.success("Real-time connection established!");
           socket.emit('join-canvas', canvasId);
         });
 
-        // Listen for content updates from other users in the room.
         socket.on('canvas-updated', (newContent: string) => {
+          // When content is received from the server, flag it as a non-local change.
+          isLocalChange.current = false;
           setContent(newContent);
         });
         
         socket.on('disconnect', () => {
           setIsConnected(false);
+          toast.error("Real-time connection lost. Reconnecting...");
+        });
+
+        // Handle connection errors
+        socket.on('connect_error', (err) => {
+            console.error("Socket connection error:", err);
+            toast.error(`Connection failed: ${err.message}`);
         });
 
       } catch (error) {
-        console.error("Failed to connect socket:", error);
+        console.error("Failed to initialize socket:", error);
+        toast.error("Could not establish real-time connection.");
       }
     };
     
@@ -72,12 +80,19 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
   // Effect to emit content updates when the debounced content changes.
   useEffect(() => {
-    // Only emit updates if the socket is connected and the content is not the initial content.
-    if (isConnected && socketRef.current && debouncedContent !== initialContent) {
+    // Only emit updates if the socket is connected and the change was made locally.
+    if (isConnected && socketRef.current && isLocalChange.current) {
       socketRef.current.emit('canvas-update', { canvasId, content: debouncedContent });
+      // Reset the flag after emitting.
+      isLocalChange.current = false;
     }
-  }, [debouncedContent, canvasId, isConnected, initialContent]);
+  }, [debouncedContent, canvasId, isConnected]);
 
+  const handleContentChange = (newContent: string) => {
+    // When the user types, flag the change as a local one before updating the state.
+    isLocalChange.current = true;
+    setContent(newContent);
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full w-full">
@@ -85,10 +100,16 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
       <Card className="flex flex-col h-full">
         <Textarea
           value={content}
-          onChange={(e) => setContent(e.target.value)}
-          className="w-full h-full p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          onChange={(e) => handleContentChange(e.target.value)}
+          className="w-full flex-grow p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
           placeholder="Start typing your markdown..."
         />
+        <CardFooter className="py-2 px-4 border-t">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className={cn("h-2 w-2 rounded-full", isConnected ? "bg-green-500" : "bg-red-500")} />
+                <span>{isConnected ? "Connected" : "Disconnected"}</span>
+            </div>
+        </CardFooter>
       </Card>
 
       {/* Preview Pane */}
@@ -100,3 +121,4 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     </div>
   );
 }
+

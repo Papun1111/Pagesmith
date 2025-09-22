@@ -32,13 +32,11 @@ export function AIAssistantPanel() {
 
       // If the response is not OK, we need to parse the error message.
       if (!res.ok) {
-        // Try to get a specific error message from the response body first.
-        const errorText = await res.text();
-        // Provide a more informative error based on the status code.
-        if (res.status === 401) {
-          throw new Error('Authentication failed. Please ensure you are logged in.');
-        }
-        throw new Error(errorText || 'The AI assistant failed to respond.');
+        // Try to get a specific JSON error message from the response body first.
+        const errorData = await res.json().catch(() => ({
+          message: `Request failed with status: ${res.status}`,
+        }));
+        throw new Error(errorData.message || 'The AI assistant failed to respond.');
       }
 
       const contentType = res.headers.get('content-type');
@@ -52,7 +50,7 @@ export function AIAssistantPanel() {
       }
 
     } catch (err: unknown) {
-      if (err instanceof Error){
+      if(err instanceof Error){
       console.error("AI Assistant Error:", err);
       setError(err.message);
       }

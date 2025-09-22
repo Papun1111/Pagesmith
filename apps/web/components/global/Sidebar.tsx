@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { PlusCircle, FileText, Users,  } from 'lucide-react';
+import { PlusCircle, FileText  } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api';
 import { type Canvas } from '@/types';
 import { cn } from '@/lib/utils';
-
+import { FaPhoenixFramework } from "react-icons/fa"
 // Reusable component for a list of canvas links
 const CanvasLinkList = ({ canvases }: { canvases: Canvas[] }) => {
   const pathname = usePathname();
@@ -80,8 +80,7 @@ export function Sidebar() {
   return (
     <aside className="h-full w-64 flex-col border-r bg-gray-100/40 p-4 dark:bg-gray-800/40 hidden md:flex">
       <div className="flex items-center gap-2 mb-6">
-        {/* Placeholder for Logo */}
-        <div className="h-8 w-8 bg-primary rounded-md" />
+        <FaPhoenixFramework></FaPhoenixFramework>
         <h2 className="text-lg font-semibold">Project Phoenix</h2>
       </div>
       <nav className="flex-1 space-y-4 overflow-y-auto">

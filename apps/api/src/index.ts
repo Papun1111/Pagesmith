@@ -23,7 +23,7 @@ const app = express();
 const httpServer = http.createServer(app);
 
 // Enable CORS for your frontend application.
-app.use(cors({ origin: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }));
+app.use(cors());
 
 
 // --- 2. Webhook Route Configuration (Crucial Order) ---
