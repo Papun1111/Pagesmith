@@ -1,135 +1,117 @@
-# Turborepo starter
+Here’s the refined `README.md` for your full-stack monorepo project **PageSmith**, with the **Getting Started** section removed and everything else polished for clarity and impact:
 
-This Turborepo starter is maintained by the Turborepo core team.
+---
 
-## Using this example
+# 🖋️ PageSmith
 
-Run the following command:
+**Your all-in-one collaborative canvas for writing, thinking, and creating.**
 
-```sh
-npx create-turbo@latest
-```
+PageSmith is a full-stack canvas application inspired by [Notion](https://www.notion.so), designed for those who prefer typing over handwriting. Whether you're writing solo or collaborating in real-time, PageSmith lets you build structured documents, personal wikis, or team workspaces — beautifully and intuitively.
 
-## What's inside?
+> 💡 *"I never liked handwritten notes — so I built a tool that lets me write and structure my thoughts the way I want, and share it with my peers. PageSmith is for people like me."*
+> — *Creator of PageSmith*
 
-This Turborepo includes the following packages/apps:
+---
 
-### Apps and Packages
+## 🚧 Project Status
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+**UNDER CONSTRUCTION** — This project is in active development and aims to:
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+* Replicate and extend **Notion’s core functionalities**
+* Provide **real-time collaborative editing**
+* Deliver a **faster**, **cheaper**, and **more user-friendly** experience
 
-### Utilities
+---
 
-This Turborepo has some additional tools already setup for you:
+## 🔮 Vision
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+PageSmith is being built with the long-term goal of becoming:
 
-### Build
+* 🧠 A second-brain system for notes, research, and ideation
+* 👥 A collaboration tool for teams, students, and creators
+* 💸 A cost-effective alternative to Notion with transparent pricing
+* 🎨 Aesthetic, distraction-free writing space with intuitive UX
 
-To build all apps and packages, run the following command:
+---
 
-```
-cd my-turborepo
+## 🏗️ Architecture Overview
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
-
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+Built using a **TurboRepo** monorepo setup for performance, modularity, and scalability.
 
 ```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+/apps
+  /web       → Frontend (Next.js + TailwindCSS)
+  /api       → Backend (Node.js, tRPC or REST)
+  /ws        → WebSocket server for real-time sync
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+/packages
+  /ui        → Shared component library (shadcn/ui, Tailwind)
+  /utils     → Shared utility functions
+  /db        → Prisma schema and client
 ```
 
-### Develop
+---
 
-To develop all apps and packages, run the following command:
+## 🧠 Core Tech Stack
 
-```
-cd my-turborepo
+| Layer          | Tools & Frameworks                                      |
+| -------------- | ------------------------------------------------------- |
+| Frontend       | **Next.js**, **TailwindCSS**, **React Query**           |
+| Backend        | **Node.js**, **Express/tRPC**, **Prisma**               |
+| Database       | **PostgreSQL**                                          |
+| Realtime       | **WebSockets** (Socket.IO or tRPC subscriptions)        |
+| Authentication | **NextAuth.js** / **JWT**                               |
+| Dev Workflow   | **TurboRepo**, **pnpm**, **Docker**, **GitHub Actions** |
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
+---
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
+## ✨ Features Roadmap
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+| Feature                       | Status    |
+| ----------------------------- | --------- |
+| Canvas-based writing space    | ✅ MVP     |
+| Block-based content model     | ✅ MVP     |
+| Real-time collaboration       | 🚧 In Dev |
+| Peer sharing & access control | 🚧 In Dev |
+| Markdown + Rich Text support  | ✅ Planned |
+| Nested pages & sidebar nav    | ✅ Planned |
+| Drag-and-drop blocks/pages    | ✅ Planned |
+| AI writing assistant          | 🔜 Future |
+| Version history & rollback    | 🔜 Future |
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
+---
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
+## 📸 Preview
 
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+> *(Screenshots or demo gifs go here once available — for now, you can drop a placeholder like below)*
 
 ```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+[📷 Canvas editing in action — Coming Soon]
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+---
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+## 🤝 Contributions
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
+PageSmith is a personal vision with open arms — if you resonate with the problem, ideas, or direction:
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
+* 🛠 Feel free to fork and explore
+* 🧠 Open issues or discussions with ideas
+* 🚀 PRs welcome when ready
 
-## Useful Links
+---
 
-Learn more about the power of Turborepo:
+## 📄 License
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+MIT License © 2025 [Papun Mohapatra](https://github.com/Papun1111)
+
+---
+
+## 🙏 Inspiration
+
+* **Notion** — The gold standard in digital workspaces
+* **Craft Docs**, **Obsidian**, and **HackMD** — For user experience and community-driven innovation
+* The frustration of scattered notes, unstructured writing tools, and expensive subscriptions
+
+---
+
