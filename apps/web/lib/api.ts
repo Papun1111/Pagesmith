@@ -51,7 +51,11 @@ export const apiClient = {
       body: JSON.stringify(data),
     });
   },
-
+  deleteCanvas: (canvasId: string, token: string): Promise<void> => {
+    return apiFetch(`/canvases/${canvasId}`, token, {
+      method: 'DELETE',
+    });
+  },
   updateCanvasTitle: (canvasId: string, title: string, token: string): Promise<Canvas> => {
     return apiFetch(`/canvases/${canvasId}/title`, token, {
         method: 'PATCH',

@@ -118,3 +118,19 @@ export const removeCollaborator = async (canvasId: string, ownerId: string, coll
     return canvas;
 };
 
+export const deleteCanvas = async (canvasId: string, ownerId: string): Promise<void> => {
+    const canvas = await Canvas.findById(canvasId);
+
+    if (!canvas) {
+        throw new ApiError(404, 'Canvas not found.');
+    }
+
+    if (canvas.ownerId !== ownerId) {
+        throw new ApiError(403, 'You do not have permission to delete this canvas.');
+    }
+
+    await Canvas.findByIdAndDelete(canvasId);
+    logger.info(`Canvas with ID: ${canvasId} was deleted by owner: ${ownerId}`);
+};
+
+

@@ -22,7 +22,7 @@ router.patch('/:canvasId/title', CanvasController.handleUpdateCanvasTitle);
 
 // PATCH /api/canvases/:canvasId/content - Updates the main content of a specific canvas.
 router.patch('/:canvasId/content', CanvasController.handleUpdateCanvasContent);
-
+router.delete('/:canvasId', CanvasController.handleDeleteCanvas);
 
 // --- Routes for managing collaborators on a specific canvas ---
 

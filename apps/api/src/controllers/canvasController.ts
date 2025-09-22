@@ -114,4 +114,26 @@ export const handleRemoveCollaborator = async (req: Request, res: Response, next
         next(error);
     }
 };
-
+export const handleDeleteCanvas = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        // 1. Authenticate the user and get their ID.
+        const { userId } = getAuth(req);
+        if (!userId) {
+            throw new ApiError(401, 'User not authenticated.');
+        }
+        
+        // 2. Get the canvasId from the URL parameters.
+        const { canvasId } = req.params;
+        
+        // 3. Call the service to perform the deletion.
+        // The service itself handles the logic to check if the user is the owner.
+        await CanvasService.deleteCanvas(canvasId??"", userId);
+        
+        // 4. Respond with a 204 No Content status on successful deletion.
+        // This is the standard practice for DELETE requests that succeed.
+        res.status(204).send();
+    } catch (error) {
+        // 5. If any error occurs, pass it to the global error handler.
+        next(error);
+    }
+};
