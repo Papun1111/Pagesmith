@@ -1,8 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
-// It's a good practice to use an environment variable for your backend URL.
-// This makes it easy to switch between development and production environments.
+// Use an environment variable for your backend URL.
 const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:8080';
 
 /**
@@ -12,13 +11,12 @@ const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:8080';
 export async function POST(req: NextRequest) {
   try {
     // 1. Authenticate the user and get their session token.
-    // The `auth()` helper from Clerk provides the necessary functions.
-    const author =await auth();
-    const token=author.getToken();
-    // If there's no token, the user is not authenticated.
-    if (!token) {
-      return new NextResponse('Unauthorized', { status: 401 });
+    const author= await auth();
+    const userId=author.userId;
+    if (!userId) {
+      return new NextResponse('Unauthorized: User not authenticated.', { status: 401 });
     }
+    const token = await author.getToken();
 
     // 2. Extract the prompt from the incoming request body.
     const { prompt } = await req.json();
@@ -27,12 +25,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Securely forward the request to your backend service.
+    // The full URL should be http://localhost:8080/api/ai/generate
     const backendResponse = await fetch(`${BACKEND_API_URL}/api/ai/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         // Include the user's token in the Authorization header.
-        // Your backend will use this to authenticate the request and apply rate limits.
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ prompt }),
@@ -41,7 +39,6 @@ export async function POST(req: NextRequest) {
     // 4. Handle non-successful responses from the backend.
     if (!backendResponse.ok) {
       const errorBody = await backendResponse.text();
-      // Forward the backend's error message and status to the client.
       return new NextResponse(errorBody || 'Failed to get response from AI service.', {
         status: backendResponse.status,
       });
@@ -53,7 +50,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('[GEMINI_API_ROUTE_ERROR]', error);
-    // Return a generic internal server error to the client.
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

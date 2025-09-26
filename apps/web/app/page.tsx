@@ -6,26 +6,22 @@ import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-// NOTE: To use the 'Poppins' font, please add the following to your HTML head:
-// <link rel="preconnect" href="https://fonts.googleapis.com">
-// <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-// <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;900&display=swap" rel="stylesheet">
 
 const projects = [
   {
-    client: "Amazon",
-    title: "Same Day",
-    img: "https://placehold.co/800x600/FF9900/000000?text=AMAZON",
+    client: "Valhalla Brush",
+    title: "Different Day",
+    img: "https://placehold.co/800x600/FF9900/000000?text=Valhalla",
   },
   {
-    client: "AdCouncil",
-    title: "Be Your Own Hero",
-    img: "https://placehold.co/800x600/3498db/ffffff?text=AdCouncil",
+    client: "Sound Lab",
+    title: "Cooking Something",
+    img: "https://placehold.co/800x600/3498db/ffffff?text=Music",
   },
   {
-    client: "AvidXchange",
+    client: "MeetX",
     title: "Nightmare",
-    img: "https://placehold.co/800x600/e74c3c/ffffff?text=AvidXchange",
+    img: "https://placehold.co/800x600/e74c3c/ffffff?text=MeetX",
   },
 ];
 
@@ -125,7 +121,7 @@ export default function LandingPage() {
                     <div className="border border-black p-8 flex flex-col justify-center">
                         <GooglyEyes />
                         <h1 className="text-4xl md:text-5xl font-black mt-8 leading-tight">
-                           FOR TWENTY YEARS, WE&apos;VE BEEN COLLABORATING, SHAPING STORIES, AND CRAFTING RELATABLE HUMOR FOR BIG BRANDS.
+                           FOR One Month, WE&apos;VE BEEN COLLABORATING, SHAPING STORIES, AND CRAFTING RELATABLE HUMOR FOR BIG BRANDS.
                         </h1>
                     </div>
                 </section>

@@ -3,7 +3,12 @@ import User from '../models/User.js';
 import { logger } from '../utils/logger.js';
 import { ApiError } from '../utils/apiError.js';
 
-// Interface describing the expected data structure for creating/updating a user.
+// --- Define the list of special emails that get a free Hashira plan ---
+const specialAccessEmails = [
+  'gohanmohapatra@gmail.com',
+  'papunmohapatra1111@gmail.com'
+];
+
 interface UserData {
   clerkId: string;
   email?: string;
@@ -13,7 +18,8 @@ interface UserData {
 }
 
 /**
- * Creates a new user or updates an existing one in the database based on the Clerk ID.
+ * Creates a new user or updates an existing one in the database.
+ * Now includes special logic to grant the Hashira plan to specific emails.
  */
 export const createOrUpdateUser = async (userData: UserData) => {
   if (!userData.clerkId) {
@@ -27,9 +33,25 @@ export const createOrUpdateUser = async (userData: UserData) => {
       Object.entries(updateData).filter(([, value]) => value !== undefined)
     );
 
+    // --- Check if the user's email is in the special access list ---
+    let planOverride = {};
+    if (userData.email && specialAccessEmails.includes(userData.email)) {
+      planOverride = { plan: 'hashira' };
+      logger.info(`Granting special Hashira access to user: ${userData.email}`);
+    }
+
     const user = await User.findOneAndUpdate(
       { clerkId: clerkId },
-      { $set: cleanUpdateData },
+      // Merge the user data with the plan override.
+      // The plan will default to 'free' unless overridden here.
+      { 
+        $set: {
+            ...cleanUpdateData,
+            ...planOverride
+        },
+        // Only set plan to 'free' on initial document creation if it's not being overridden.
+        $setOnInsert: { plan: 'free' } 
+      },
       { new: true, upsert: true, runValidators: true }
     );
 
@@ -42,11 +64,7 @@ export const createOrUpdateUser = async (userData: UserData) => {
 };
 
 /**
- * Finds a user by their Clerk ID. If the user is not found in the local database,
- * it fetches their data from the Clerk API and creates them "just-in-time".
- * This resolves race conditions that occur after sign-up.
- * @param clerkId - The Clerk ID of the user to find.
- * @returns The user document.
+ * Finds a user by their Clerk ID. If not found, it creates them just-in-time.
  */
 export const findUserByClerkId = async (clerkId: string) => {
   if (!clerkId) {
@@ -55,7 +73,6 @@ export const findUserByClerkId = async (clerkId: string) => {
   
   let user = await User.findOne({ clerkId });
 
-  // If user is not found, attempt to create them just-in-time.
   if (!user) {
     logger.warn(`User ${clerkId} not found in DB. Attempting to create just-in-time.`);
     try {
@@ -70,10 +87,9 @@ export const findUserByClerkId = async (clerkId: string) => {
         imageUrl: clerkUser.imageUrl,
       });
       logger.info(`Successfully created user ${clerkId} just-in-time.`);
-    } catch (error) {
-        logger.error(`Failed to fetch or create user from Clerk API for clerkId ${clerkId}:`, error);
-        // If we fail to create the user, we must throw the not found error.
-        throw new ApiError(404, 'User not found.'); 
+    } catch (error: any) {
+        logger.error(`Failed to fetch or create user from Clerk API for clerkId ${clerkId}:`, error.errors || error.message || error);
+        throw new ApiError(404, 'User could not be verified with the authentication provider.'); 
     }
   }
 

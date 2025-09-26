@@ -22,7 +22,6 @@ export default function MainLayout({
         {/* Header */}
         <Header />
 
-        {/* Page Content - this is where the actual page components will be rendered */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-800">
           {children}
         </main>

@@ -8,7 +8,7 @@ import { Sidebar } from './Sidebar';
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-[#F0F0F0]">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
@@ -26,6 +26,9 @@ export function Header() {
             </Link>
             <Link href="/pricing" className="text-muted-foreground transition-colors hover:text-foreground">
               Pricing
+            </Link>
+             <Link href="/settings/billing" className="text-muted-foreground transition-colors hover:text-foreground">
+              Upgrade Plans
             </Link>
           </nav>
         </div>

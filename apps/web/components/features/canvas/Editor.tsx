@@ -19,8 +19,9 @@ interface EditorProps {
   initialContent: string;
 }
 
+// Fixed interface to match ReactMarkdown's expected props
 interface CodeBlockProps {
-  children: string;
+  children?: ReactNode;
   className?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
@@ -71,7 +72,8 @@ function CodeBlock({ children, className, ...rest }: CodeBlockProps) {
   const match = /language-(\w+)/.exec(className || "");
   const language = match ? match[1] : "";
   const isInline = !match;
-  const content = String(children).replace(/\n$/, "");
+  // Safe conversion of children to string, handling undefined/null cases
+  const content = String(children || "").replace(/\n$/, "");
 
   if (isInline) {
     return (
@@ -411,9 +413,9 @@ Tab - Indent in code blocks`;
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full w-full bg-gradient-to-br from-blue-900 via-black to-blue-800">
-      {/* Input Pane with Dark Theme and Blue Gradient Background */}
-      <Card className="flex flex-col h-full bg-gradient-to-br from-slate-900/80 to-blue-900/60 border-blue-600/30 backdrop-blur-sm">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full w-full bg-gray-100">
+      {/* Input Pane with Light Theme */}
+      <Card className="flex flex-col h-full bg-white border-gray-200 shadow-sm">
         <div className="relative flex-grow">
           <Textarea
             ref={textareaRef}
@@ -422,7 +424,7 @@ Tab - Indent in code blocks`;
             onInput={handleInput}
             onKeyDown={handleKeyDown}
             onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
-            className="w-full h-full p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm leading-relaxed bg-transparent text-white placeholder:text-blue-200/60"
+            className="w-full h-full p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm leading-relaxed bg-transparent text-gray-800 placeholder:text-gray-400"
             placeholder=""
             style={{
               minHeight: "100%",
@@ -433,23 +435,23 @@ Tab - Indent in code blocks`;
           />
           {/* Enhanced placeholder overlay when empty */}
           {!content.trim() && (
-            <div className="absolute inset-4 pointer-events-none text-blue-200/60 text-sm leading-relaxed whitespace-pre-line font-mono">
+            <div className="absolute inset-4 pointer-events-none text-gray-400 text-sm leading-relaxed whitespace-pre-line font-mono">
               {getPlaceholderText()}
             </div>
           )}
         </div>
-        <CardFooter className="py-2 px-4 border-t border-blue-600/30 bg-slate-800/60">
+        <CardFooter className="py-2 px-4 border-t border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2 text-xs text-blue-200">
+            <div className="flex items-center gap-2 text-xs text-gray-600">
               <div
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  isConnected ? "bg-green-400" : "bg-red-400"
+                  isConnected ? "bg-green-500" : "bg-red-500"
                 )}
               />
               <span>{isConnected ? "Connected" : "Disconnected"}</span>
             </div>
-            <div className="text-xs text-blue-200">
+            <div className="text-xs text-gray-600">
               {content.length} chars | Line{" "}
               {content.substring(0, cursorPosition).split("\n").length}
             </div>
@@ -463,9 +465,8 @@ Tab - Indent in code blocks`;
           {content.trim() ? (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              //
               components={{
-                code:CodeBlock,
+                code: CodeBlock,
                 blockquote(props) {
                   const blockquoteContent = String(props.children);
                   return (

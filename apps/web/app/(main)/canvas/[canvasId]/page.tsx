@@ -11,96 +11,109 @@ import type { Canvas } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AIAssistantPanel } from '@/components/features/ai/AIAssistantPanel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { AlertTriangle } from 'lucide-react';
+
+
+// NOTE: To use the 'Poppins' font, please add the following to your HTML head:
+// <link rel="preconnect" href="https://fonts.googleapis.com">
+// <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+// <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;900&display=swap" rel="stylesheet">
+
 
 export default function CanvasPage() {
-  const params = useParams();
-  const canvasId = params.canvasId as string;
-  const { getToken } = useAuth();
-  const [canvas, setCanvas] = useState<Canvas | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const params = useParams();
+  const canvasId = params.canvasId as string;
+  const { getToken } = useAuth();
+  const [canvas, setCanvas] = useState<Canvas | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const onCanvasUpdate = (updatedCanvas: Canvas) => {
-    setCanvas(updatedCanvas);
-  };
+  const onCanvasUpdate = (updatedCanvas: Canvas) => {
+    setCanvas(updatedCanvas);
+  };
 
-  useEffect(() => {
-    const fetchCanvasData = async () => {
-      if (typeof canvasId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(canvasId)) {
-        if (canvasId) {
-          setError('Invalid Canvas ID provided in the URL.');
-          setIsLoading(false);
-        }
-        return;
-      }
-      setIsLoading(true);
-      setError(null);
-      try {
-        const token = await getToken();
-        if (!token) throw new Error('Authentication token not found.');
-        const fetchedCanvas = await apiClient.getCanvasById(canvasId, token);
-        setCanvas(fetchedCanvas);
-      } catch (err: unknown) {
-        console.error('Failed to fetch canvas:', err);
-        // Updated error handling to be more robust
-        if (err instanceof Error) {
-          setError(err.message || 'An unknown error occurred while loading the canvas.');
-        } else {
-          setError('An unknown error occurred while loading the canvas.');
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchCanvasData();
-  }, [canvasId, getToken]);
+  useEffect(() => {
+    const fetchCanvasData = async () => {
+      if (typeof canvasId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(canvasId)) {
+        if (canvasId) {
+          setError('Invalid Canvas ID provided in the URL.');
+          setIsLoading(false);
+        }
+        return;
+      }
+      setIsLoading(true);
+      setError(null);
+      try {
+        const token = await getToken();
+        if (!token) throw new Error('Authentication token not found.');
+        const fetchedCanvas = await apiClient.getCanvasById(canvasId, token);
+        setCanvas(fetchedCanvas);
+      } catch (err: unknown) {
+        console.error('Failed to fetch canvas:', err);
+        if (err instanceof Error) {
+          setError(err.message || 'An unknown error occurred while loading the canvas.');
+        } else {
+          setError('An unknown error occurred while loading the canvas.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCanvasData();
+  }, [canvasId, getToken]);
 
-  if (isLoading) {
-    return (
-      <div className="p-4 md:p-6 lg:p-8 h-full">
-        <Skeleton className="h-12 w-1/3 mb-4" />
-        <Skeleton className="h-full w-full" />
-      </div>
-    );
-  }
+  if (isLoading) {
+    return (
+      <div style={{ fontFamily: "'Poppins', sans-serif" }} className="p-8 h-full bg-[#F0F0F0]">
+        <Skeleton className="h-12 w-1/3 mb-4 bg-gray-300" />
+        <Skeleton className="h-[calc(100%-4rem)] w-full bg-gray-300" />
+      </div>
+    );
+  }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full text-red-500">
-        <p>Error: {error}</p>
-      </div>
-    );
-  }
+  if (error) {
+    return (
+        <div style={{ fontFamily: "'Poppins', sans-serif" }} className="flex items-center justify-center h-full text-red-700 bg-[#F0F0F0] p-8">
+             <div className="flex items-center gap-4 border border-red-500 bg-red-100 p-4 font-bold">
+                <AlertTriangle className="h-6 w-6" />
+                <p>Error: {error}</p>
+            </div>
+      </div>
+    );
+  }
 
-  if (!canvas) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p>Canvas not found.</p>
-      </div>
-    );
-  }
+  if (!canvas) {
+    return (
+      <div style={{ fontFamily: "'Poppins', sans-serif" }} className="flex items-center justify-center h-full bg-[#F0F0F0]">
+        <p className="font-black text-2xl">Canvas not found.</p>
+      </div>
+    );
+  }
 
-  return (
-    <div className="flex flex-col h-full">
-      <header className="flex-shrink-0 p-4 border-b flex items-center justify-between">
-        <Toolbar canvas={canvas} onCanvasUpdate={onCanvasUpdate} />
-        <CollaborationAvatars collaborators={canvas.collaborators} />
-      </header>
+  return (
+    <div style={{ fontFamily: "'Poppins', sans-serif" }} className="flex flex-col h-screen bg-[#F0F0F0] text-[#111111]">
+        {/* The header assumes Toolbar and CollaborationAvatars components will be styled to match */}
+      <header className="flex-shrink-0 p-4 border-b border-black flex items-center justify-between">
+        <Toolbar canvas={canvas} onCanvasUpdate={onCanvasUpdate} />
+        <CollaborationAvatars collaborators={canvas.collaborators} />
+      </header>
 
-      {/* Use a resizable panel group to house the editor and AI assistant */}
-      <ResizablePanelGroup direction="horizontal" className="flex-grow">
-        <ResizablePanel defaultSize={75}>
-          <main className="flex-grow p-4 md:p-6 lg:p-8 overflow-y-auto h-full">
-            <Editor canvasId={canvas._id} initialContent={canvas.content} />
-          </main>
-        </ResizablePanel>
-        <ResizableHandle withHandle />
+      <ResizablePanelGroup direction="horizontal" className="flex-grow">
+        <ResizablePanel defaultSize={75}>
+            {/* The Editor component is assumed to have its own internal styling that will fit this container */}
+          <main className="h-full overflow-y-auto p-2">
+            <Editor canvasId={canvas._id} initialContent={canvas.content} />
+          </main>
+        </ResizablePanel>
+
+        {/* Styled resizable handle */}
+        <ResizableHandle withHandle className="bg-transparent border-x-2 border-black w-4 hover:bg-black/10 transition-colors" />
+        
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-          {/* Add the AI Assistant Panel here */}
-          <AIAssistantPanel />
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </div>
-  );
+            {/* The AIAssistantPanel is assumed to have styling that fits this container */}
+          <AIAssistantPanel />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </div>
+  );
 }
-

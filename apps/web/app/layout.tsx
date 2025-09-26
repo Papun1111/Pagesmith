@@ -22,6 +22,11 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
+        <head>
+          <link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" />
+<link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet"></link>
+        </head>
         <body className={cn("font-sans antialiased", font.className)}>
           {children}
         </body>

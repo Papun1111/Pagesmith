@@ -11,10 +11,7 @@ interface ManageSubscriptionButtonProps {
   stripeCustomerId?: string | null;
 }
 
-/**
- * A button that either prompts users to upgrade or redirects them
- * to the Stripe customer portal to manage their existing subscription.
- */
+
 export function ManageSubscriptionButton({
   isFreePlan,
   stripeCustomerId,
@@ -49,10 +46,12 @@ export function ManageSubscriptionButton({
       const { url } = await response.json();
       // Redirect the user to the Stripe portal.
       window.location.href = url;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      if(error instanceof Error){
       console.error(error);
       alert(`Error: ${error.message}`);
       setIsLoading(false);
+      }
     }
   };
 

@@ -7,101 +7,105 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Sparkles, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
+// NOTE: To use the 'Poppins' font, please add the following to your HTML head:
+// <link rel="preconnect" href="https://fonts.googleapis.com">
+// <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+// <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;900&display=swap" rel="stylesheet">
+
 export function AIAssistantPanel() {
-  const [prompt, setPrompt] = useState('');
-  const [response, setResponse] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState('');
+  const [response, setResponse] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prompt.trim()) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prompt.trim()) return;
 
-    setIsLoading(true);
-    setError(null);
-    setResponse('');
+    setIsLoading(true);
+    setError(null);
+    setResponse('');
 
-    try {
-      const res = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt }),
-      });
+    try {
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
+      });
+        console.log(res.text);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({
+          message: `Request failed with status: ${res.status}`,
+        }));
+        throw new Error(errorData.message || 'The AI assistant failed to respond.');
+      }
 
-      // If the response is not OK, we need to parse the error message.
-      if (!res.ok) {
-        // Try to get a specific JSON error message from the response body first.
-        const errorData = await res.json().catch(() => ({
-          message: `Request failed with status: ${res.status}`,
-        }));
-        throw new Error(errorData.message || 'The AI assistant failed to respond.');
-      }
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await res.json();
+        setResponse(data.response);
+      } else {
+        const errorText = await res.text();
+        console.error("Received non-JSON response from AI API:", errorText);
+        throw new Error('Received an invalid response from the AI assistant. Check the server logs.');
+      }
 
-      const contentType = res.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await res.json();
-        setResponse(data.response);
-      } else {
-        const errorText = await res.text();
-        console.error("Received non-JSON response from AI API:", errorText);
-        throw new Error('Received an invalid response from the AI assistant. Check the server logs.');
-      }
+    } catch (err: unknown) {
+      if(err instanceof Error){
+      console.error("AI Assistant Error:", err);
+      setError(err.message);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    } catch (err: unknown) {
-      if(err instanceof Error){
-      console.error("AI Assistant Error:", err);
-      setError(err.message);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <Card className="h-full flex flex-col border-0 shadow-none rounded-none">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          AI Assistant
-        </CardTitle>
-        <CardDescription>
-          Ask me to brainstorm, write code, or generate ideas.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col flex-grow gap-4">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-          <Textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="e.g., Explain React hooks in simple terms..."
-            rows={4}
-            disabled={isLoading}
-          />
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'Generating...' : 'Generate Response'}
-          </Button>
-        </form>
-
-        <div className="flex-grow overflow-y-auto rounded-md border p-4 bg-gray-50 dark:bg-gray-800/50">
-          {isLoading && <Skeleton className="w-full h-24" />}
-          {error && (
-            <div className="text-red-500 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-              <div>
-                <p className="font-semibold">An error occurred:</p>
-                <p className="text-xs">{error}</p>
-              </div>
-            </div>
-          )}
-          {response && <p className="text-sm whitespace-pre-wrap">{response}</p>}
-          {!isLoading && !error && !response && (
-            <p className="text-sm text-muted-foreground">Your AI-generated content will appear here.</p>
-          )}
+  return (
+    <div style={{ fontFamily: "'Poppins', sans-serif" }} className="h-full flex flex-col bg-[#F0F0F0] text-[#111111] p-4">
+        <div className="flex-shrink-0">
+            <h2 className="text-2xl font-black flex items-center gap-2">
+                <Sparkles className="h-6 w-6" />
+                AI Assistant
+            </h2>
+            <p className="text-sm text-black/70 mt-1">
+                Ask me to brainstorm, write code, or generate ideas.
+            </p>
         </div>
-      </CardContent>
-    </Card>
-  );
-}
+        
+        <div className="flex flex-col flex-grow gap-4 mt-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="e.g., Explain React hooks in simple terms..."
+                    rows={4}
+                    disabled={isLoading}
+                    className="bg-white border-2 border-black rounded-none focus:ring-0 focus:border-black"
+                />
+                <Button type="submit" disabled={isLoading} className="bg-black text-white rounded-none hover:bg-black/80 font-bold py-5">
+                    {isLoading ? 'Generating...' : 'Generate Response'}
+                </Button>
+            </form>
 
+            <div className="flex-grow overflow-y-auto rounded-none border-2 border-black p-4 bg-white">
+                {isLoading && <Skeleton className="w-full h-24 bg-gray-300" />}
+                {error && (
+                    <div className="text-red-700 flex items-start gap-2 border border-red-500 bg-red-100 p-2">
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-1" />
+                        <div>
+                            <p className="font-bold text-sm">An error occurred:</p>
+                            <p className="text-xs">{error}</p>
+                        </div>
+                    </div>
+                )}
+                {response && <p className="text-sm whitespace-pre-wrap">{response}</p>}
+                {!isLoading && !error && !response && (
+                    <p className="text-sm text-black/60">Your AI-generated content will appear here.</p>
+                )}
+            </div>
+        </div>
+    </div>
+  );
+}
