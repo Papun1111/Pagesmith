@@ -29,7 +29,7 @@ export default function BillingPage() {
         if (!token) throw new Error("User not authenticated.");
         const profile = await apiClient.getUserProfile(token);
         setUserProfile(profile);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to fetch user profile:", err);
         setError("Could not load your subscription details. Please try again later.");
       } finally {

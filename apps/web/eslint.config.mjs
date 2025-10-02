@@ -19,6 +19,10 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
     ],
+    rules: {
+      "@next/next/no-page-custom-font": "off",
+      "@next/next/no-img-element": "off", // (optional, common in Next.js apps)
+    },
   },
 ];
 

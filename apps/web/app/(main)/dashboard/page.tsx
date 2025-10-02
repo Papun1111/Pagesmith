@@ -8,7 +8,7 @@ import { apiClient } from '@/lib/api'; // Mocked below
 import type { Canvas } from '@/types'; // Mocked below
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, FileText, AlertTriangle, Users, ArrowUpRight } from 'lucide-react';
+import { PlusCircle, FileText, AlertTriangle, ArrowUpRight } from 'lucide-react';
 import { motion } from 'motion/react';
 
 

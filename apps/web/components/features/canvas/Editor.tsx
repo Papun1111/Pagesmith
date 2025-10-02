@@ -32,7 +32,6 @@ interface CodeBlockProps {
  */
 function CopyButton({
   content,
-  language,
 }: {
   content: string;
   language?: string;
