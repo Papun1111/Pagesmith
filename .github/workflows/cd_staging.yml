@@ -19,9 +19,20 @@ jobs:
 
           # SSH and deploy
           ssh -o StrictHostKeyChecking=no -i ssh_key root@159.65.159.179 << 'EOF'
+          
+            # Install pnpm globally if missing
+            if ! command -v pnpm >/dev/null; then
+              npm install -g pnpm
+            fi
+
+            # Install pm2 globally if missing
+            if ! command -v pm2 >/dev/null; then
+              npm install -g pm2
+            fi
+
             cd Pagesmith && git pull origin main
             pnpm install
             pnpm run build
-            pm2 restart http
-            pm2 restart web
+            pm2 restart http || pm2 start dist/http.js --name http
+            pm2 restart wb || pm2 start dist/wb.js --name wb
           EOF
