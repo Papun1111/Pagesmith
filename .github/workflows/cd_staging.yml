@@ -48,5 +48,5 @@ jobs:
 
             # Restart or start PM2 processes
             pm2 restart http || pm2 start dist/http.js --name http
-            pm2 restart wb || pm2 start dist/wb.js --name wb
+            pm2 restart web || pm2 start dist/wb.js --name wb
           EOF
