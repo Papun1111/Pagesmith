@@ -1,0 +1,27 @@
+name: Deploy to Pagesmith (DigitalOcean)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy_pagesmith:
+    name: Deploy Pagesmith to DigitalOcean
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH into DigitalOcean and deploy
+        run: |
+          # Save the private key from secrets and secure it
+          echo "${{ secrets.SSH_PRIVATE_KEY_DO }}" > ssh_key
+          chmod 600 ssh_key
+
+          # SSH and deploy
+          ssh -o StrictHostKeyChecking=no -i ssh_key root@159.65.159.179 << 'EOF'
+            cd Pagesmith && git pull origin main
+            pnpm install
+            pnpm run build
+            pm2 restart http
+            pm2 restart web
+          EOF
