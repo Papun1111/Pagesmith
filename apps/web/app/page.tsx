@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Moon, Sun } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -69,6 +69,7 @@ const GooglyEyes = () => (
 
 export default function LandingPage() {
     const [currentProject, setCurrentProject] = useState(0);
+    const [isDarkMode, setIsDarkMode] = useState(false);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -77,21 +78,40 @@ export default function LandingPage() {
         return () => clearInterval(timer);
     }, []);
 
+    useEffect(() => {
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, [isDarkMode]);
+
+    const toggleDarkMode = () => {
+        setIsDarkMode(!isDarkMode);
+    };
+
     return (
-        <main style={{ fontFamily: "'Poppins', sans-serif" }} className="w-full bg-[#F0F0F0] text-[#111111]">
+        <main  className="w-full bg-[#F0F0F0] dark:bg-[#1a1a1a] text-[#111111] dark:text-[#F0F0F0]">
             {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 px-8 bg-[#F0F0F0]/80 backdrop-blur-sm border-b border-black">
+            <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 px-8 bg-[#F0F0F0]/80 dark:bg-[#1a1a1a]/80 backdrop-blur-sm border-b border-black dark:border-white">
                 <Link href="/" className="text-2xl font-black cursor-pointer">PageSmith</Link>
                 <nav className="hidden md:flex items-center gap-6 font-bold">
                     <a href="#work" className="cursor-pointer">Work</a>
                     <a href="#news" className="cursor-pointer">News</a>
                     <a href="#about" className="cursor-pointer">About</a>
-                    <Button className="bg-black text-white rounded-none hover:bg-black/80">CONTACT</Button>
+                    <Button className="bg-black dark:bg-white text-white dark:text-black rounded-none hover:bg-black/80 dark:hover:bg-white/80">CONTACT</Button>
                 </nav>
+                <button 
+                    onClick={toggleDarkMode}
+                    className="ml-4 p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10"
+                    aria-label="Toggle dark mode"
+                >
+                    {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                </button>
             </header>
 
             {/* Vertical Text Sidebar */}
-            <div className="fixed top-0 left-0 z-40 h-full hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0]">
+            <div className="fixed top-0 left-0 z-40 h-full hidden md:flex items-center justify-center border-r border-black dark:border-white bg-[#F0F0F0] dark:bg-[#1a1a1a]">
                 <span className="font-black text-xl [writing-mode:vertical-rl] tracking-widest uppercase">
                     Work Work Work Work Work Work
                 </span>
@@ -99,8 +119,8 @@ export default function LandingPage() {
 
             <div className="md:ml-16 pt-20">
                 {/* Hero Section */}
-                <section id="work" className="min-h-[90vh] grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border-b-2 border-black">
-                    <div className="border border-black p-2 h-[60vh] md:h-auto">
+                <section id="work" className="min-h-[90vh] grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border-b-2 border-black dark:border-white">
+                    <div className="border border-black dark:border-white p-2 h-[60vh] md:h-auto">
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={currentProject}
@@ -118,7 +138,7 @@ export default function LandingPage() {
                             </motion.div>
                         </AnimatePresence>
                     </div>
-                    <div className="border border-black p-8 flex flex-col justify-center">
+                    <div className="border border-black dark:border-white p-8 flex flex-col justify-center">
                         <GooglyEyes />
                         <h1 className="text-4xl md:text-5xl font-black mt-8 leading-tight">
                            FOR One Month, WE&apos;VE BEEN COLLABORATING, SHAPING STORIES, AND CRAFTING RELATABLE HUMOR FOR BIG BRANDS.
@@ -127,7 +147,7 @@ export default function LandingPage() {
                 </section>
 
                 {/* News Section */}
-                <section id="news" className="p-4 border-b-2 border-black bg-[#FF4136] text-white">
+                <section id="news" className="p-4 border-b-2 border-black dark:border-white bg-[#FF4136] dark:bg-[#8B0000] text-white">
                     <div className="p-8">
                         <h2 className="text-8xl md:text-9xl font-black">IN YOUR</h2>
                         <h2 className="text-8xl md:text-9xl font-black">FEED.</h2>
@@ -160,7 +180,7 @@ export default function LandingPage() {
                         Inspired by Notion, built for productivity. Bring your ideas, code, and tasks together in one seamless, real-time workspace. We provide the tools, you provide the genius.
                      </p>
                      <Link href="/sign-up">
-                        <Button size="lg" className="bg-black text-white rounded-none hover:bg-black/80 mt-8">
+                        <Button size="lg" className="bg-black dark:bg-white text-white dark:text-black rounded-none hover:bg-black/80 dark:hover:bg-white/80 mt-8">
                             Get Started Free <ArrowUpRight className="ml-2 h-5 w-5" />
                         </Button>
                      </Link>
@@ -169,4 +189,3 @@ export default function LandingPage() {
         </main>
     );
 }
-
