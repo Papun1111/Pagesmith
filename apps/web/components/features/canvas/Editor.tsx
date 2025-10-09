@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Eye, Edit3, Download } from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -120,6 +120,21 @@ function CodeBlock({ children, className, ...rest }: CodeBlockProps) {
   );
 }
 
+// Helper function to extract text content from ReactNode
+function extractTextContent(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(extractTextContent).join("");
+  }
+  if (node && typeof node === "object" && "props" in node) {
+    const element = node as { props: { children?: ReactNode } };
+    return extractTextContent(element.props.children);
+  }
+  return "";
+}
+
 /**
  * The main editor component for the canvas. It now uses the `useSocket` hook
  * to manage its real-time connection and provides syntax highlighting with
@@ -128,6 +143,7 @@ function CodeBlock({ children, className, ...rest }: CodeBlockProps) {
 export function Editor({ canvasId, initialContent }: EditorProps) {
   const [content, setContent] = useState(initialContent);
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [previewOnly, setPreviewOnly] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Use the custom hook to manage the socket connection.
@@ -411,8 +427,163 @@ Tab - Indent in code blocks`;
     return "Continue writing...";
   };
 
+  const PreviewContent = () => (
+    <article className="prose prose-invert max-w-none p-6 prose-headings:text-white prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-white prose-strong:text-white prose-strong:font-bold prose-em:text-blue-100 prose-em:italic prose-a:text-blue-300 prose-a:hover:text-blue-200">
+      {content.trim() ? (
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            code: CodeBlock,
+            blockquote(props) {
+              const blockquoteContent = extractTextContent(props.children);
+              return (
+                <div className="relative group">
+                  <CopyButton content={blockquoteContent} />
+                  <blockquote className="border-l-4 border-blue-400 pl-4 py-2 bg-blue-900/30 italic text-white my-4 rounded-r-md">
+                    {props.children}
+                  </blockquote>
+                </div>
+              );
+            },
+            p(props) {
+              const paragraphContent = extractTextContent(props.children);
+              return (
+                <div className="relative group">
+                  <CopyButton content={paragraphContent} />
+                  <p className="text-white">{props.children}</p>
+                </div>
+              );
+            },
+            strong(props) {
+              return (
+                <strong className="font-bold text-white">{props.children}</strong>
+              );
+            },
+            em(props) {
+              return (
+                <em className="italic text-blue-100">{props.children}</em>
+              );
+            },
+            a(props) {
+              const href = props.href || "";
+              // Ensure https:// protocol
+              const secureHref = href.startsWith("http://") 
+                ? href.replace("http://", "https://")
+                : href.startsWith("https://") || href.startsWith("/") || href.startsWith("#")
+                ? href
+                : `https://${href}`;
+              
+              return (
+                <a
+                  href={secureHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-300 hover:text-blue-200 underline"
+                >
+                  {props.children}
+                </a>
+              );
+            },
+            table(props) {
+              return (
+                <div className="overflow-x-auto my-4">
+                  <table className="w-full border-collapse border border-blue-600 rounded-lg">
+                    {props.children}
+                  </table>
+                </div>
+              );
+            },
+            th(props) {
+              return (
+                <th className="border border-blue-600 px-4 py-2 bg-blue-800/60 font-semibold text-left text-white">
+                  {props.children}
+                </th>
+              );
+            },
+            td(props) {
+              return (
+                <td className="border border-blue-600 px-4 py-2 text-white">
+                  {props.children}
+                </td>
+              );
+            },
+            ul(props) {
+              return (
+                <ul className="list-disc list-inside space-y-1 text-white">
+                  {props.children}
+                </ul>
+              );
+            },
+            ol(props) {
+              return (
+                <ol className="list-decimal list-inside space-y-1 text-white">
+                  {props.children}
+                </ol>
+              );
+            },
+            li(props) {
+              return <li className="text-white">{props.children}</li>;
+            },
+            h1(props) {
+              return <h1 className="text-white font-bold">{props.children}</h1>;
+            },
+            h2(props) {
+              return <h2 className="text-white font-bold">{props.children}</h2>;
+            },
+            h3(props) {
+              return <h3 className="text-white font-bold">{props.children}</h3>;
+            },
+          }}
+        >
+          {content}
+        </ReactMarkdown>
+      ) : (
+        <div className="text-blue-200/60 italic text-center py-12">
+          <div className="text-4xl mb-4">✨</div>
+          <p className="text-blue-200">
+            Start typing to see your content come to life...
+          </p>
+          <p className="text-sm mt-2 text-blue-300/70">
+            Use{" "}
+            <code className="bg-blue-800/60 px-2 py-1 rounded text-white">
+              /
+            </code>{" "}
+            commands for quick formatting
+          </p>
+        </div>
+      )}
+    </article>
+  );
+
+  if (previewOnly) {
+    return (
+      <div className="h-full w-full bg-gray-100 relative">
+        <Button
+          onClick={() => setPreviewOnly(false)}
+          className="absolute top-4 right-4 z-10 bg-blue-600 hover:bg-blue-700 text-white"
+          size="sm"
+        >
+          <Edit3 className="h-4 w-4 mr-2" />
+          Edit Mode
+        </Button>
+        <Card className="h-full overflow-y-auto bg-gradient-to-br from-slate-900/80 to-blue-900/60 border-blue-600/30 backdrop-blur-sm">
+          <PreviewContent />
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full w-full bg-gray-100">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full w-full bg-gray-100 relative">
+      <Button
+        onClick={() => setPreviewOnly(true)}
+        className="absolute top-4 right-4 z-10 bg-blue-600 hover:bg-blue-700 text-white"
+        size="sm"
+      >
+        <Eye className="h-4 w-4 mr-2" />
+        Preview Only
+      </Button>
+      
       {/* Input Pane with Light Theme */}
       <Card className="flex flex-col h-full bg-white border-gray-200 shadow-sm">
         <div className="relative flex-grow">
@@ -460,102 +631,10 @@ Tab - Indent in code blocks`;
 
       {/* Enhanced Preview Pane with Dark Theme and Blue Gradient Background */}
       <Card className="h-full overflow-y-auto bg-gradient-to-br from-slate-900/80 to-blue-900/60 border-blue-600/30 backdrop-blur-sm">
-        <article className="prose prose-invert max-w-none p-6 prose-headings:text-white prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-white prose-strong:text-white prose-em:text-blue-100 prose-a:text-blue-300 prose-a:hover:text-blue-200">
-          {content.trim() ? (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                code: CodeBlock,
-                blockquote(props) {
-                  const blockquoteContent = String(props.children);
-                  return (
-                    <div className="relative group">
-                      <CopyButton content={blockquoteContent} />
-                      <blockquote className="border-l-4 border-blue-400 pl-4 py-2 bg-blue-900/30 italic text-white my-4 rounded-r-md">
-                        {props.children}
-                      </blockquote>
-                    </div>
-                  );
-                },
-                p(props) {
-                  const paragraphContent = String(props.children);
-                  return (
-                    <div className="relative group">
-                      <CopyButton content={paragraphContent} />
-                      <p className="text-white">{props.children}</p>
-                    </div>
-                  );
-                },
-                table(props) {
-                  return (
-                    <div className="overflow-x-auto my-4">
-                      <table className="w-full border-collapse border border-blue-600 rounded-lg">
-                        {props.children}
-                      </table>
-                    </div>
-                  );
-                },
-                th(props) {
-                  return (
-                    <th className="border border-blue-600 px-4 py-2 bg-blue-800/60 font-semibold text-left text-white">
-                      {props.children}
-                    </th>
-                  );
-                },
-                td(props) {
-                  return (
-                    <td className="border border-blue-600 px-4 py-2 text-white">
-                      {props.children}
-                    </td>
-                  );
-                },
-                ul(props) {
-                  return (
-                    <ul className="list-disc list-inside space-y-1 text-white">
-                      {props.children}
-                    </ul>
-                  );
-                },
-                ol(props) {
-                  return (
-                    <ol className="list-decimal list-inside space-y-1 text-white">
-                      {props.children}
-                    </ol>
-                  );
-                },
-                li(props) {
-                  return <li className="text-white">{props.children}</li>;
-                },
-                h1(props) {
-                  return <h1 className="text-white">{props.children}</h1>;
-                },
-                h2(props) {
-                  return <h2 className="text-white">{props.children}</h2>;
-                },
-                h3(props) {
-                  return <h3 className="text-white">{props.children}</h3>;
-                },
-              }}
-            >
-              {content}
-            </ReactMarkdown>
-          ) : (
-            <div className="text-blue-200/60 italic text-center py-12">
-              <div className="text-4xl mb-4">✨</div>
-              <p className="text-blue-200">
-                Start typing to see your content come to life...
-              </p>
-              <p className="text-sm mt-2 text-blue-300/70">
-                Use{" "}
-                <code className="bg-blue-800/60 px-2 py-1 rounded text-white">
-                  /
-                </code>{" "}
-                commands for quick formatting
-              </p>
-            </div>
-          )}
-        </article>
+        <PreviewContent />
       </Card>
     </div>
   );
 }
+
+export default Editor;
