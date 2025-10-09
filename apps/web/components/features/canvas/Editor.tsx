@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Copy, Check, Eye, Edit3, Download } from "lucide-react";
+import { Copy, Check, Eye, Edit3, Download, Upload } from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -144,7 +144,10 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
   const [content, setContent] = useState(initialContent);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [previewOnly, setPreviewOnly] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Use the custom hook to manage the socket connection.
   // This replaces all the manual connection logic.
@@ -427,8 +430,96 @@ Tab - Indent in code blocks`;
     return "Continue writing...";
   };
 
+  const exportToPDF = async () => {
+    if (!previewRef.current) return;
+    
+    setIsExporting(true);
+    
+    try {
+      // Dynamically import html2canvas and jspdf
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      
+      // Capture the preview content as canvas
+      const canvas = await html2canvas(previewRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#0f172a',
+        logging: false,
+      });
+      
+      // Convert canvas to image
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Calculate PDF dimensions
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      
+      // Create PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      let position = 0;
+      
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // Add additional pages if content is longer than one page
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `canvas-${canvasId}-${timestamp}.pdf`;
+      
+      // Save the PDF
+      pdf.save(filename);
+    } catch (error) {
+      console.error('Failed to export PDF:', error);
+      alert('Failed to export PDF. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (text) {
+        setContent(text);
+        isLocalChange.current = true;
+      }
+    };
+
+    reader.onerror = () => {
+      alert('Failed to read file. Please try again.');
+    };
+
+    // Read the file as text
+    reader.readAsText(file);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const triggerFileImport = () => {
+    fileInputRef.current?.click();
+  };
+
   const PreviewContent = () => (
-    <article className="prose prose-invert max-w-none p-6 prose-headings:text-white prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-white prose-strong:text-white prose-strong:font-bold prose-em:text-blue-100 prose-em:italic prose-a:text-blue-300 prose-a:hover:text-blue-200">
+    <article ref={previewRef} className="prose prose-invert max-w-none p-6 prose-headings:text-white prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-white prose-strong:text-white prose-strong:font-bold prose-em:text-blue-100 prose-em:italic prose-a:text-blue-300 prose-a:hover:text-blue-200">
       {content.trim() ? (
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
@@ -558,14 +649,25 @@ Tab - Indent in code blocks`;
   if (previewOnly) {
     return (
       <div className="h-full w-full bg-gray-100 relative">
-        <Button
-          onClick={() => setPreviewOnly(false)}
-          className="absolute top-4 right-4 z-10 bg-blue-600 hover:bg-blue-700 text-white"
-          size="sm"
-        >
-          <Edit3 className="h-4 w-4 mr-2" />
-          Edit Mode
-        </Button>
+        <div className="absolute top-4 right-4 z-10 flex gap-2">
+          <Button
+            onClick={exportToPDF}
+            disabled={isExporting || !content.trim()}
+            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            size="sm"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {isExporting ? 'Exporting...' : 'Export PDF'}
+          </Button>
+          <Button
+            onClick={() => setPreviewOnly(false)}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            size="sm"
+          >
+            <Edit3 className="h-4 w-4 mr-2" />
+            Edit Mode
+          </Button>
+        </div>
         <Card className="h-full overflow-y-auto bg-gradient-to-br from-slate-900/80 to-blue-900/60 border-blue-600/30 backdrop-blur-sm">
           <PreviewContent />
         </Card>
@@ -575,14 +677,25 @@ Tab - Indent in code blocks`;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full w-full bg-gray-100 relative">
-      <Button
-        onClick={() => setPreviewOnly(true)}
-        className="absolute top-4 right-4 z-10 bg-blue-600 hover:bg-blue-700 text-white"
-        size="sm"
-      >
-        <Eye className="h-4 w-4 mr-2" />
-        Preview Only
-      </Button>
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <Button
+          onClick={exportToPDF}
+          disabled={isExporting || !content.trim()}
+          className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          size="sm"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          {isExporting ? 'Exporting...' : 'Export PDF'}
+        </Button>
+        <Button
+          onClick={() => setPreviewOnly(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+          size="sm"
+        >
+          <Eye className="h-4 w-4 mr-2" />
+          Preview Only
+        </Button>
+      </div>
       
       {/* Input Pane with Light Theme */}
       <Card className="flex flex-col h-full bg-white border-gray-200 shadow-sm">
