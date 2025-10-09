@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight, Moon, Sun } from "lucide-react";
+import { ArrowUpRight, Moon, Sun, FileText, Users, Code, BookOpen } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -42,6 +42,29 @@ const newsItems = [
   },
 ];
 
+const features = [
+  {
+    icon: FileText,
+    title: "Readme Preview",
+    description: "Check and format your documentation with live preview capabilities.",
+  },
+  {
+    icon: BookOpen,
+    title: "Save Notes",
+    description: "Capture and organize your thoughts and ideas in one place.",
+  },
+  {
+    icon: Users,
+    title: "Real-time Collaboration",
+    description: "Work together seamlessly with your team on projects and documents.",
+  },
+  {
+    icon: Code,
+    title: "Code Snippets",
+    description: "Save, organize, and reuse code snippets for any purpose.",
+  },
+];
+
 // Animated Googly Eyes Graphic
 const GooglyEyes = () => (
   <motion.div
@@ -70,13 +93,11 @@ export default function LandingPage() {
   const [currentProject, setCurrentProject] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Initialize dark mode from localStorage
   useEffect(() => {
     const savedMode = localStorage.getItem("darkMode");
     if (savedMode !== null) {
       setIsDarkMode(savedMode === "true");
     } else {
-      // Optional: Check system preference
       const prefersDark = window.matchMedia(
         "(prefers-color-scheme: dark)"
       ).matches;
@@ -115,6 +136,9 @@ export default function LandingPage() {
         <nav className="hidden md:flex items-center gap-6 font-bold">
           <a href="#work" className="cursor-pointer">
             Work
+          </a>
+          <a href="#features" className="cursor-pointer">
+            Features
           </a>
           <a href="#news" className="cursor-pointer">
             News
@@ -178,6 +202,35 @@ export default function LandingPage() {
               FOR One Month, WE&apos;VE BEEN COLLABORATING, SHAPING STORIES, AND
               CRAFTING RELATABLE HUMOR FOR BIG BRANDS.
             </h1>
+          </div>
+        </section>
+
+        {/* Features Section */}
+        <section
+          id="features"
+          className="p-4 md:p-8 border-b-2 border-black dark:border-white bg-white dark:bg-[#0a0a0a]"
+        >
+          <div className="p-4 md:p-8">
+            <h2 className="text-5xl md:text-7xl font-black mb-12">POWERFUL FEATURES</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {features.map((feature, index) => {
+                const Icon = feature.icon;
+                return (
+                  <motion.div
+                    key={index}
+                    className="border-2 border-black dark:border-white p-6"
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.5 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <Icon className="h-12 w-12 mb-4" />
+                    <h3 className="text-2xl font-black mb-2">{feature.title}</h3>
+                    <p className="text-lg dark:text-gray-300">{feature.description}</p>
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
         </section>
 
