@@ -436,53 +436,218 @@ Tab - Indent in code blocks`;
     setIsExporting(true);
     
     try {
-      // Dynamically import html2canvas and jspdf
-      const html2canvas = (await import('html2canvas')).default;
-      const { jsPDF } = await import('jspdf');
+      // Clone the preview content to avoid modifying the original
+      const clonedContent = previewRef.current.cloneNode(true) as HTMLElement;
       
-      // Capture the preview content as canvas
-      const canvas = await html2canvas(previewRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#0f172a',
-        logging: false,
+      // Remove all buttons and interactive elements
+      const buttons = clonedContent.querySelectorAll('button');
+      buttons.forEach(btn => btn.remove());
+      
+      // Convert all computed styles to inline styles to avoid oklch issues
+      const allElements = clonedContent.querySelectorAll('*');
+      allElements.forEach((element) => {
+        const htmlElement = element as HTMLElement;
+        const computedStyle = window.getComputedStyle(htmlElement);
+        
+        // Get RGB color values instead of oklch
+        const color = computedStyle.color;
+        const backgroundColor = computedStyle.backgroundColor;
+        const borderColor = computedStyle.borderColor;
+        
+        // Only set basic styles that we need
+        if (color && color !== 'rgba(0, 0, 0, 0)' && !color.includes('oklch')) {
+          htmlElement.style.color = color;
+        }
+        if (backgroundColor && backgroundColor !== 'rgba(0, 0, 0, 0)' && !backgroundColor.includes('oklch')) {
+          htmlElement.style.backgroundColor = backgroundColor;
+        }
+        if (borderColor && borderColor !== 'rgba(0, 0, 0, 0)' && !borderColor.includes('oklch')) {
+          htmlElement.style.borderColor = borderColor;
+        }
       });
       
-      // Convert canvas to image
-      const imgData = canvas.toDataURL('image/png');
+      const previewContent = clonedContent.innerHTML;
       
-      // Calculate PDF dimensions
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 297; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      
-      // Create PDF
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      let position = 0;
-      
-      // Add first page
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      
-      // Add additional pages if content is longer than one page
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      // Create a printable version
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        throw new Error('Please allow pop-ups to export PDF');
       }
       
-      // Generate filename with timestamp
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `canvas-${canvasId}-${timestamp}.pdf`;
+      // Create a styled HTML document for printing - avoiding oklch colors
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Canvas Export - ${canvasId}</title>
+            <style>
+              * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+              }
+              
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                line-height: 1.6;
+                color: rgb(26, 26, 26);
+                background: rgb(255, 255, 255);
+                padding: 40px;
+                max-width: 800px;
+                margin: 0 auto;
+              }
+              
+              h1 {
+                font-size: 2em;
+                margin: 1em 0 0.5em 0;
+                font-weight: bold;
+                color: rgb(0, 0, 0);
+              }
+              
+              h2 {
+                font-size: 1.5em;
+                margin: 0.83em 0 0.5em 0;
+                font-weight: bold;
+                color: rgb(0, 0, 0);
+              }
+              
+              h3 {
+                font-size: 1.17em;
+                margin: 1em 0 0.5em 0;
+                font-weight: bold;
+                color: rgb(0, 0, 0);
+              }
+              
+              p {
+                margin: 1em 0;
+                color: rgb(26, 26, 26);
+              }
+              
+              strong {
+                font-weight: bold;
+                color: rgb(0, 0, 0);
+              }
+              
+              em {
+                font-style: italic;
+                color: rgb(26, 26, 26);
+              }
+              
+              a {
+                color: rgb(0, 102, 204);
+                text-decoration: underline;
+              }
+              
+              code {
+                background: rgb(245, 245, 245);
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-family: 'Courier New', monospace;
+                font-size: 0.9em;
+                color: rgb(0, 0, 0);
+                border: 1px solid rgb(221, 221, 221);
+              }
+              
+              pre {
+                background: rgb(245, 245, 245);
+                padding: 16px;
+                border-radius: 6px;
+                overflow-x: auto;
+                margin: 1em 0;
+                border: 1px solid rgb(221, 221, 221);
+              }
+              
+              pre code {
+                background: none;
+                padding: 0;
+                color: rgb(0, 0, 0);
+                border: none;
+              }
+              
+              blockquote {
+                border-left: 4px solid rgb(0, 102, 204);
+                padding-left: 16px;
+                margin: 1em 0;
+                color: rgb(85, 85, 85);
+                font-style: italic;
+                background: rgb(250, 250, 250);
+                padding: 12px 12px 12px 16px;
+                border-radius: 0 4px 4px 0;
+              }
+              
+              ul, ol {
+                margin: 1em 0;
+                padding-left: 2em;
+              }
+              
+              li {
+                margin: 0.5em 0;
+                color: rgb(26, 26, 26);
+              }
+              
+              table {
+                border-collapse: collapse;
+                width: 100%;
+                margin: 1em 0;
+                border: 1px solid rgb(221, 221, 221);
+              }
+              
+              th, td {
+                border: 1px solid rgb(221, 221, 221);
+                padding: 12px;
+                text-align: left;
+                color: rgb(26, 26, 26);
+              }
+              
+              th {
+                background: rgb(245, 245, 245);
+                font-weight: bold;
+                color: rgb(0, 0, 0);
+              }
+              
+              /* Hide all buttons and interactive elements */
+              button {
+                display: none !important;
+              }
+              
+              svg {
+                display: inline-block;
+                vertical-align: middle;
+              }
+              
+              @media print {
+                body {
+                  padding: 20px;
+                }
+                
+                @page {
+                  margin: 2cm;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            ${previewContent}
+          </body>
+        </html>
+      `;
       
-      // Save the PDF
-      pdf.save(filename);
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      
+      // Wait for content to load
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+          setIsExporting(false);
+        }, 250);
+      };
+      
     } catch (error) {
       console.error('Failed to export PDF:', error);
-      alert('Failed to export PDF. Please try again.');
-    } finally {
+      alert(error instanceof Error ? error.message : 'Failed to export PDF. Please try again.');
       setIsExporting(false);
     }
   };
@@ -677,7 +842,24 @@ Tab - Indent in code blocks`;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full w-full bg-gray-100 relative">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".txt,.md,.markdown"
+        onChange={handleImportFile}
+        className="hidden"
+      />
+      
       <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <Button
+          onClick={triggerFileImport}
+          className="bg-purple-600 hover:bg-purple-700 text-white"
+          size="sm"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Import
+        </Button>
         <Button
           onClick={exportToPDF}
           disabled={isExporting || !content.trim()}
