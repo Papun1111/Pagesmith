@@ -4,8 +4,19 @@ import { useState, useEffect, useRef, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Copy, Check, Eye, Edit3, Download, Upload } from "lucide-react";
+// UPDATED: Using themes with better readability for light and dark modes
+import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import {
+  Copy,
+  Check,
+  Eye,
+  Edit3,
+  Download,
+  Upload,
+  Moon,
+  Sun,
+  Palette,
+} from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -19,7 +30,6 @@ interface EditorProps {
   initialContent: string;
 }
 
-// Fixed interface to match ReactMarkdown's expected props
 interface CodeBlockProps {
   children?: ReactNode;
   className?: string;
@@ -27,14 +37,125 @@ interface CodeBlockProps {
   [key: string]: any;
 }
 
+type ColorTheme = "light" | "nord" | "slate" | "ocean";
+
+interface ThemeColors {
+  bg: string;
+  text: string;
+  codeBlockBg: string;
+  codeBg: string;
+  codeBorder: string;
+  codeText: string;
+  blockquoteBg: string;
+  blockquoteBorder: string;
+  blockquoteText: string;
+  linkColor: string;
+  linkHover: string;
+  tableBg: string;
+  tableBorder: string;
+  tableHeaderBg: string;
+  tableHeaderText: string;
+  tableText: string;
+  cardBg: string;
+  cardBorder: string;
+}
+
+// REFINED: Themes now apply colors to the editor/preview cards, not just the background.
+const lightThemes: Record<ColorTheme, ThemeColors> = {
+  light: {
+    bg: "bg-indigo-100",
+    text: "text-indigo-950",
+    codeBlockBg: "#f8f5ff",
+    codeBg: "bg-indigo-200",
+    codeBorder: "border-indigo-300",
+    codeText: "text-indigo-900",
+    blockquoteBg: "bg-indigo-200",
+    blockquoteBorder: "border-indigo-500",
+    blockquoteText: "text-indigo-800",
+    linkColor: "text-indigo-600",
+    linkHover: "hover:text-indigo-700",
+    tableBg: "bg-indigo-50",
+    tableBorder: "border-indigo-300",
+    tableHeaderBg: "bg-indigo-200",
+    tableHeaderText: "text-indigo-900",
+    tableText: "text-indigo-900",
+    cardBg: "bg-indigo-50",
+    cardBorder: "border-indigo-200",
+  },
+  nord: {
+    bg: "bg-slate-200",
+    text: "text-slate-900",
+    codeBlockBg: "#eceff4",
+    codeBg: "bg-slate-300",
+    codeBorder: "border-slate-400",
+    codeText: "text-slate-900",
+    blockquoteBg: "bg-slate-300",
+    blockquoteBorder: "border-slate-600",
+    blockquoteText: "text-slate-800",
+    linkColor: "text-cyan-700",
+    linkHover: "hover:text-cyan-800",
+    tableBg: "bg-slate-100",
+    tableBorder: "border-slate-400",
+    tableHeaderBg: "bg-slate-300",
+    tableHeaderText: "text-slate-900",
+    tableText: "text-slate-900",
+    cardBg: "bg-slate-100",
+    cardBorder: "border-slate-300",
+  },
+  slate: {
+    bg: "bg-emerald-100",
+    text: "text-emerald-950",
+    codeBlockBg: "#f0fdf4",
+    codeBg: "bg-emerald-200",
+    codeBorder: "border-emerald-300",
+    codeText: "text-emerald-900",
+    blockquoteBg: "bg-emerald-200",
+    blockquoteBorder: "border-emerald-600",
+    blockquoteText: "text-emerald-800",
+    linkColor: "text-teal-600",
+    linkHover: "hover:text-teal-700",
+    tableBg: "bg-emerald-50",
+    tableBorder: "border-emerald-300",
+    tableHeaderBg: "bg-emerald-200",
+    tableHeaderText: "text-emerald-900",
+    tableText: "text-emerald-900",
+    cardBg: "bg-emerald-50",
+    cardBorder: "border-emerald-200",
+  },
+  ocean: {
+    bg: "bg-cyan-100",
+    text: "text-cyan-950",
+    codeBlockBg: "#ecf8ff",
+    codeBg: "bg-cyan-200",
+    codeBorder: "border-cyan-300",
+    codeText: "text-cyan-900",
+    blockquoteBg: "bg-cyan-200",
+    blockquoteBorder: "border-blue-600",
+    blockquoteText: "text-cyan-800",
+    linkColor: "text-blue-600",
+    linkHover: "hover:text-blue-700",
+    tableBg: "bg-cyan-50",
+    tableBorder: "border-cyan-300",
+    tableHeaderBg: "bg-cyan-200",
+    tableHeaderText: "text-cyan-900",
+    tableText: "text-cyan-900",
+    cardBg: "bg-cyan-50",
+    cardBorder: "border-cyan-200",
+  },
+};
+
 /**
  * Copy button component for code blocks
  */
 function CopyButton({
   content,
+  isDarkMode,
+  theme,
 }: {
   content: string;
   language?: string;
+  isDarkMode: boolean;
+  theme: ColorTheme;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -52,13 +173,28 @@ function CopyButton({
     <Button
       variant="ghost"
       size="sm"
-      className="absolute top-2 right-2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 hover:bg-gray-700 border border-gray-600"
+      className={cn(
+        "absolute top-2 right-2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity border",
+        isDarkMode
+          ? "bg-slate-800 hover:bg-slate-700 border-slate-700"
+          : "bg-white/50 hover:bg-white/80 border-slate-300"
+      )}
       onClick={handleCopy}
     >
       {copied ? (
-        <Check className="h-3 w-3 text-green-400" />
+        <Check
+          className={cn(
+            "h-3 w-3",
+            isDarkMode ? "text-green-400" : "text-green-600"
+          )}
+        />
       ) : (
-        <Copy className="h-3 w-3 text-white" />
+        <Copy
+          className={cn(
+            "h-3 w-3",
+            isDarkMode ? "text-white" : lightThemes[theme]?.codeText
+          )}
+        />
       )}
     </Button>
   );
@@ -67,18 +203,33 @@ function CopyButton({
 /**
  * Enhanced code block component with copy functionality
  */
-function CodeBlock({ children, className, ...rest }: CodeBlockProps) {
+function CodeBlock({
+  children,
+  className,
+  isDarkMode,
+  theme,
+  ...rest
+}: CodeBlockProps & { isDarkMode: boolean; theme: ColorTheme }) {
   const match = /language-(\w+)/.exec(className || "");
   const language = match ? match[1] : "";
   const isInline = !match;
-  // Safe conversion of children to string, handling undefined/null cases
   const content = String(children || "").replace(/\n$/, "");
+  const themeColors = lightThemes[theme];
 
   if (isInline) {
     return (
       <code
         {...rest}
-        className="bg-gray-800 text-white px-2 py-1 rounded font-mono text-sm border border-gray-600"
+        className={cn(
+          "px-2 py-1 rounded font-mono text-sm border",
+          isDarkMode
+            ? "bg-slate-800 text-white border-slate-600"
+            : cn(
+                themeColors.codeBg,
+                themeColors.codeText,
+                themeColors.codeBorder
+              )
+        )}
       >
         {children}
       </code>
@@ -87,31 +238,41 @@ function CodeBlock({ children, className, ...rest }: CodeBlockProps) {
 
   return (
     <div className="relative group my-4">
-      {/* Language label */}
       {language && (
-        <div className="absolute top-2 left-4 text-xs text-gray-300 bg-gray-700 px-2 py-1 rounded-md z-10">
+        <div
+          className={cn(
+            "absolute top-2 left-4 text-xs px-2 py-1 rounded-md z-10",
+            isDarkMode
+              ? "text-gray-300 bg-gray-700"
+              : cn(themeColors.codeBg, themeColors.codeText)
+          )}
+        >
           {language}
         </div>
       )}
 
-      {/* Copy button */}
-      <CopyButton content={content} language={language} />
+      <CopyButton
+        content={content}
+        language={language}
+        isDarkMode={isDarkMode}
+        theme={theme}
+      />
 
-      {/* Code block */}
       <SyntaxHighlighter
-        style={vscDarkPlus}
+        style={isDarkMode ? oneDark : oneLight}
         language={language || "text"}
         PreTag="div"
-        className="rounded-lg border border-gray-600"
+        className={cn(
+          "rounded-lg border",
+          isDarkMode ? "border-slate-700" : themeColors.codeBorder
+        )}
         customStyle={{
           margin: 0,
           borderRadius: "0.5rem",
           fontSize: "14px",
           lineHeight: "1.6",
-          backgroundColor: "#1e1e1e",
           padding: "1rem",
           paddingTop: language ? "2.5rem" : "1rem",
-          color: "#ffffff",
         }}
       >
         {content}
@@ -120,7 +281,6 @@ function CodeBlock({ children, className, ...rest }: CodeBlockProps) {
   );
 }
 
-// Helper function to extract text content from ReactNode
 function extractTextContent(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") {
     return String(node);
@@ -145,54 +305,44 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
   const [cursorPosition, setCursorPosition] = useState(0);
   const [previewOnly, setPreviewOnly] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [colorTheme, setColorTheme] = useState<ColorTheme>("light");
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Use the custom hook to manage the socket connection.
-  // This replaces all the manual connection logic.
   const { socket, isConnected } = useSocket(canvasId);
 
-  // This ref is crucial to prevent the editor from sending content back to the
-  // server that it just received (an "echo").
   const isLocalChange = useRef(false);
   const debouncedContent = useDebounce(content, 500);
 
-  // Effect to listen for incoming content updates from other users.
   useEffect(() => {
     if (!socket) return;
 
     const handleUpdate = (newContent: string) => {
-      // When we receive an update, we flag that it was not a local change.
       isLocalChange.current = false;
       setContent(newContent);
     };
 
     socket.on("canvas-updated", handleUpdate);
 
-    // Clean up the event listener when the component unmounts or the socket changes.
     return () => {
       socket.off("canvas-updated", handleUpdate);
     };
   }, [socket]);
 
-  // Effect to send local content updates to the server.
   useEffect(() => {
-    // We only send an update if the connection is live, the socket exists,
-    // and the change was made by the local user.
     if (isConnected && socket && isLocalChange.current) {
       socket.emit("canvas-update", { canvasId, content: debouncedContent });
-      // Reset the flag after sending the update.
       isLocalChange.current = false;
     }
   }, [debouncedContent, canvasId, isConnected, socket]);
 
-  // Notion-like shortcuts for quick formatting
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget;
     const { selectionStart, selectionEnd } = textarea;
 
-    // Handle Tab key for code blocks
     if (e.key === "Tab") {
       e.preventDefault();
       const beforeCursor = content.substring(0, selectionStart);
@@ -207,13 +357,11 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
       return;
     }
 
-    // Handle Enter key for auto-formatting
     if (e.key === "Enter") {
       const beforeCursor = content.substring(0, selectionStart);
       const lines = beforeCursor.split("\n");
       const currentLine = lines[lines.length - 1];
 
-      // Auto-continue lists
       if (currentLine.match(/^\s*[\*\-\+]\s/)) {
         e.preventDefault();
         const match = currentLine.match(/^(\s*)([\*\-\+]\s)/);
@@ -225,7 +373,6 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
         return;
       }
 
-      // Auto-continue numbered lists
       if (currentLine.match(/^\s*\d+\.\s/)) {
         e.preventDefault();
         const match = currentLine.match(/^(\s*)(\d+)(\.\s)/);
@@ -238,7 +385,6 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
       }
     }
 
-    // Quick shortcuts with Cmd/Ctrl
     if (e.metaKey || e.ctrlKey) {
       switch (e.key) {
         case "b":
@@ -257,13 +403,11 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     }
   };
 
-  // Handle special command replacements - FIXED VERSION
   const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget;
     const newValue = textarea.value;
     const { selectionStart } = textarea;
 
-    // Check if we just typed a space after a slash command
     if (newValue[selectionStart - 1] === " ") {
       const beforeCursor = newValue.substring(0, selectionStart - 1);
       const afterCursor = newValue.substring(selectionStart);
@@ -278,36 +422,36 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
         switch (command) {
           case "code":
             replacement = "```\n// Add your code here\n```";
-            cursorOffset = 4; // Position cursor after first newline
+            cursorOffset = 4;
             break;
           case "js":
           case "javascript":
             replacement =
               "```javascript\n// Add your JavaScript code here\nconsole.log('Hello, World!');\n```";
-            cursorOffset = 13; // Position cursor after "```javascript\n"
+            cursorOffset = 13;
             break;
           case "ts":
           case "typescript":
             replacement =
               "```typescript\n// Add your TypeScript code here\ninterface Example {\n  message: string;\n}\n\nconst example: Example = {\n  message: 'Hello, World!'\n};\n```";
-            cursorOffset = 14; // Position cursor after "```typescript\n"
+            cursorOffset = 14;
             break;
           case "py":
           case "python":
             replacement =
               "```python\n# Add your Python code here\ndef hello_world():\n    print('Hello, World!')\n\nhello_world()\n```";
-            cursorOffset = 10; // Position cursor after "```python\n"
+            cursorOffset = 10;
             break;
           case "md":
           case "markdown":
             replacement =
               "```markdown\n# Add your Markdown content here\n\n**Bold text** and *italic text*\n\n- List item 1\n- List item 2\n```";
-            cursorOffset = 12; // Position cursor after "```markdown\n"
+            cursorOffset = 12;
             break;
           case "json":
             replacement =
               '```json\n{\n  "key": "value",\n  "number": 123,\n  "boolean": true\n}\n```';
-            cursorOffset = 8; // Position cursor after "```json\n"
+            cursorOffset = 8;
             break;
           case "h1":
             replacement = "# ";
@@ -332,7 +476,7 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
           case "table":
             replacement =
               "| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |";
-            cursorOffset = 12; // Position cursor at first header
+            cursorOffset = 12;
             break;
         }
 
@@ -354,7 +498,6 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
       }
     }
 
-    // Update content normally if no command was triggered
     setContent(newValue);
     isLocalChange.current = true;
   };
@@ -407,6 +550,7 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
   const getPlaceholderText = () => {
     if (!content.trim()) {
+      // ADDED: Descriptions for /md and /json commands
       return `Type '/' for commands, or start writing...
 
 Quick Commands:
@@ -432,49 +576,50 @@ Tab - Indent in code blocks`;
 
   const exportToPDF = async () => {
     if (!previewRef.current) return;
-    
+
     setIsExporting(true);
-    
+
     try {
-      // Clone the preview content to avoid modifying the original
       const clonedContent = previewRef.current.cloneNode(true) as HTMLElement;
-      
-      // Remove all buttons and interactive elements
-      const buttons = clonedContent.querySelectorAll('button');
-      buttons.forEach(btn => btn.remove());
-      
-      // Convert all computed styles to inline styles to avoid oklch issues
-      const allElements = clonedContent.querySelectorAll('*');
+
+      const buttons = clonedContent.querySelectorAll("button");
+      buttons.forEach((btn) => btn.remove());
+
+      const allElements = clonedContent.querySelectorAll("*");
       allElements.forEach((element) => {
         const htmlElement = element as HTMLElement;
         const computedStyle = window.getComputedStyle(htmlElement);
-        
-        // Get RGB color values instead of oklch
+
         const color = computedStyle.color;
         const backgroundColor = computedStyle.backgroundColor;
         const borderColor = computedStyle.borderColor;
-        
-        // Only set basic styles that we need
-        if (color && color !== 'rgba(0, 0, 0, 0)' && !color.includes('oklch')) {
+
+        if (color && color !== "rgba(0, 0, 0, 0)" && !color.includes("oklch")) {
           htmlElement.style.color = color;
         }
-        if (backgroundColor && backgroundColor !== 'rgba(0, 0, 0, 0)' && !backgroundColor.includes('oklch')) {
+        if (
+          backgroundColor &&
+          backgroundColor !== "rgba(0, 0, 0, 0)" &&
+          !backgroundColor.includes("oklch")
+        ) {
           htmlElement.style.backgroundColor = backgroundColor;
         }
-        if (borderColor && borderColor !== 'rgba(0, 0, 0, 0)' && !borderColor.includes('oklch')) {
+        if (
+          borderColor &&
+          borderColor !== "rgba(0, 0, 0, 0)" &&
+          !borderColor.includes("oklch")
+        ) {
           htmlElement.style.borderColor = borderColor;
         }
       });
-      
+
       const previewContent = clonedContent.innerHTML;
-      
-      // Create a printable version
-      const printWindow = window.open('', '_blank');
+
+      const printWindow = window.open("", "_blank");
       if (!printWindow) {
-        throw new Error('Please allow pop-ups to export PDF');
+        throw new Error("Please allow pop-ups to export PDF");
       }
       
-      // Create a styled HTML document for printing - avoiding oklch colors
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -498,133 +643,25 @@ Tab - Indent in code blocks`;
                 margin: 0 auto;
               }
               
-              h1 {
-                font-size: 2em;
-                margin: 1em 0 0.5em 0;
-                font-weight: bold;
-                color: rgb(0, 0, 0);
-              }
-              
-              h2 {
-                font-size: 1.5em;
-                margin: 0.83em 0 0.5em 0;
-                font-weight: bold;
-                color: rgb(0, 0, 0);
-              }
-              
-              h3 {
-                font-size: 1.17em;
-                margin: 1em 0 0.5em 0;
-                font-weight: bold;
-                color: rgb(0, 0, 0);
-              }
-              
-              p {
-                margin: 1em 0;
-                color: rgb(26, 26, 26);
-              }
-              
-              strong {
-                font-weight: bold;
-                color: rgb(0, 0, 0);
-              }
-              
-              em {
-                font-style: italic;
-                color: rgb(26, 26, 26);
-              }
-              
-              a {
-                color: rgb(0, 102, 204);
-                text-decoration: underline;
-              }
-              
-              code {
-                background: rgb(245, 245, 245);
-                padding: 2px 6px;
-                border-radius: 3px;
-                font-family: 'Courier New', monospace;
-                font-size: 0.9em;
-                color: rgb(0, 0, 0);
-                border: 1px solid rgb(221, 221, 221);
-              }
-              
-              pre {
-                background: rgb(245, 245, 245);
-                padding: 16px;
-                border-radius: 6px;
-                overflow-x: auto;
-                margin: 1em 0;
-                border: 1px solid rgb(221, 221, 221);
-              }
-              
-              pre code {
-                background: none;
-                padding: 0;
-                color: rgb(0, 0, 0);
-                border: none;
-              }
-              
-              blockquote {
-                border-left: 4px solid rgb(0, 102, 204);
-                padding-left: 16px;
-                margin: 1em 0;
-                color: rgb(85, 85, 85);
-                font-style: italic;
-                background: rgb(250, 250, 250);
-                padding: 12px 12px 12px 16px;
-                border-radius: 0 4px 4px 0;
-              }
-              
-              ul, ol {
-                margin: 1em 0;
-                padding-left: 2em;
-              }
-              
-              li {
-                margin: 0.5em 0;
-                color: rgb(26, 26, 26);
-              }
-              
-              table {
-                border-collapse: collapse;
-                width: 100%;
-                margin: 1em 0;
-                border: 1px solid rgb(221, 221, 221);
-              }
-              
-              th, td {
-                border: 1px solid rgb(221, 221, 221);
-                padding: 12px;
-                text-align: left;
-                color: rgb(26, 26, 26);
-              }
-              
-              th {
-                background: rgb(245, 245, 245);
-                font-weight: bold;
-                color: rgb(0, 0, 0);
-              }
-              
-              /* Hide all buttons and interactive elements */
-              button {
-                display: none !important;
-              }
-              
-              svg {
-                display: inline-block;
-                vertical-align: middle;
-              }
-              
-              @media print {
-                body {
-                  padding: 20px;
-                }
-                
-                @page {
-                  margin: 2cm;
-                }
-              }
+              h1 { font-size: 2em; margin: 1em 0 0.5em 0; font-weight: bold; color: rgb(0, 0, 0); }
+              h2 { font-size: 1.5em; margin: 0.83em 0 0.5em 0; font-weight: bold; color: rgb(0, 0, 0); }
+              h3 { font-size: 1.17em; margin: 1em 0 0.5em 0; font-weight: bold; color: rgb(0, 0, 0); }
+              p { margin: 1em 0; color: rgb(26, 26, 26); }
+              strong { font-weight: bold; color: rgb(0, 0, 0); }
+              em { font-style: italic; color: rgb(26, 26, 26); }
+              a { color: rgb(0, 102, 204); text-decoration: underline; }
+              code { background: rgb(245, 245, 245); padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; color: rgb(0, 0, 0); border: 1px solid rgb(221, 221, 221); }
+              pre { background: rgb(245, 245, 245); padding: 16px; border-radius: 6px; overflow-x: auto; margin: 1em 0; border: 1px solid rgb(221, 221, 221); }
+              pre code { background: none; padding: 0; color: rgb(0, 0, 0); border: none; }
+              blockquote { border-left: 4px solid rgb(0, 102, 204); padding-left: 16px; margin: 1em 0; color: rgb(85, 85, 85); font-style: italic; background: rgb(250, 250, 250); padding: 12px 12px 12px 16px; border-radius: 0 4px 4px 0; }
+              ul, ol { margin: 1em 0; padding-left: 2em; }
+              li { margin: 0.5em 0; color: rgb(26, 26, 26); }
+              table { border-collapse: collapse; width: 100%; margin: 1em 0; border: 1px solid rgb(221, 221, 221); }
+              th, td { border: 1px solid rgb(221, 221, 221); padding: 12px; text-align: left; color: rgb(26, 26, 26); }
+              th { background: rgb(245, 245, 245); font-weight: bold; color: rgb(0, 0, 0); }
+              button { display: none !important; }
+              svg { display: inline-block; vertical-align: middle; }
+              @media print { body { padding: 20px; } @page { margin: 2cm; } }
             </style>
           </head>
           <body>
@@ -632,11 +669,10 @@ Tab - Indent in code blocks`;
           </body>
         </html>
       `;
-      
+
       printWindow.document.write(htmlContent);
       printWindow.document.close();
-      
-      // Wait for content to load
+
       printWindow.onload = () => {
         setTimeout(() => {
           printWindow.print();
@@ -644,10 +680,13 @@ Tab - Indent in code blocks`;
           setIsExporting(false);
         }, 250);
       };
-      
     } catch (error) {
-      console.error('Failed to export PDF:', error);
-      alert(error instanceof Error ? error.message : 'Failed to export PDF. Please try again.');
+      console.error("Failed to export PDF:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to export PDF. Please try again."
+      );
       setIsExporting(false);
     }
   };
@@ -657,7 +696,7 @@ Tab - Indent in code blocks`;
     if (!file) return;
 
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       const text = e.target?.result as string;
       if (text) {
@@ -667,15 +706,13 @@ Tab - Indent in code blocks`;
     };
 
     reader.onerror = () => {
-      alert('Failed to read file. Please try again.');
+      alert("Failed to read file. Please try again.");
     };
 
-    // Read the file as text
     reader.readAsText(file);
-    
-    // Reset file input
+
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
@@ -683,19 +720,50 @@ Tab - Indent in code blocks`;
     fileInputRef.current?.click();
   };
 
+  const themeColors = lightThemes[colorTheme];
+
   const PreviewContent = () => (
-    <article ref={previewRef} className="prose prose-invert max-w-none p-6 prose-headings:text-white prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-white prose-strong:text-white prose-strong:font-bold prose-em:text-blue-100 prose-em:italic prose-a:text-blue-300 prose-a:hover:text-blue-200">
+    <article
+      ref={previewRef}
+      className={cn(
+        "prose max-w-none p-6",
+        isDarkMode
+          ? "prose-invert prose-headings:text-white prose-p:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-blockquote:text-gray-300"
+          : ""
+      )}
+    >
       {content.trim() ? (
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
-            code: CodeBlock,
+            code: (props) => (
+              <CodeBlock
+                {...props}
+                isDarkMode={isDarkMode}
+                theme={colorTheme}
+              />
+            ),
             blockquote(props) {
               const blockquoteContent = extractTextContent(props.children);
               return (
                 <div className="relative group">
-                  <CopyButton content={blockquoteContent} />
-                  <blockquote className="border-l-4 border-blue-400 pl-4 py-2 bg-blue-900/30 italic text-white my-4 rounded-r-md">
+                  <CopyButton
+                    content={blockquoteContent}
+                    isDarkMode={isDarkMode}
+                    theme={colorTheme}
+                  />
+                  <blockquote
+                    className={cn(
+                      "border-l-4 pl-4 py-2 italic my-4 rounded-r-md",
+                      isDarkMode
+                        ? "border-blue-500 bg-blue-900/30 text-gray-100"
+                        : cn(
+                            themeColors.blockquoteBorder,
+                            themeColors.blockquoteBg,
+                            themeColors.blockquoteText
+                          )
+                    )}
+                  >
                     {props.children}
                   </blockquote>
                 </div>
@@ -705,36 +773,64 @@ Tab - Indent in code blocks`;
               const paragraphContent = extractTextContent(props.children);
               return (
                 <div className="relative group">
-                  <CopyButton content={paragraphContent} />
-                  <p className="text-white">{props.children}</p>
+                  <CopyButton
+                    content={paragraphContent}
+                    isDarkMode={isDarkMode}
+                    theme={colorTheme}
+                  />
+                  <p className={isDarkMode ? "text-gray-300" : themeColors.text}>
+                    {props.children}
+                  </p>
                 </div>
               );
             },
             strong(props) {
               return (
-                <strong className="font-bold text-white">{props.children}</strong>
+                <strong
+                  className={cn(
+                    "font-bold",
+                    isDarkMode ? "text-white" : themeColors.text
+                  )}
+                >
+                  {props.children}
+                </strong>
               );
             },
             em(props) {
               return (
-                <em className="italic text-blue-100">{props.children}</em>
+                <em
+                  className={cn(
+                    "italic",
+                    isDarkMode
+                      ? "text-blue-200"
+                      : cn(themeColors.linkColor, themeColors.linkHover)
+                  )}
+                >
+                  {props.children}
+                </em>
               );
             },
             a(props) {
               const href = props.href || "";
-              // Ensure https:// protocol
-              const secureHref = href.startsWith("http://") 
+              const secureHref = href.startsWith("http://")
                 ? href.replace("http://", "https://")
-                : href.startsWith("https://") || href.startsWith("/") || href.startsWith("#")
+                : href.startsWith("https://") ||
+                  href.startsWith("/") ||
+                  href.startsWith("#")
                 ? href
                 : `https://${href}`;
-              
+
               return (
                 <a
                   href={secureHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-300 hover:text-blue-200 underline"
+                  className={cn(
+                    "underline",
+                    isDarkMode
+                      ? "text-blue-400 hover:text-blue-300"
+                      : cn(themeColors.linkColor, themeColors.linkHover)
+                  )}
                 >
                   {props.children}
                 </a>
@@ -743,7 +839,12 @@ Tab - Indent in code blocks`;
             table(props) {
               return (
                 <div className="overflow-x-auto my-4">
-                  <table className="w-full border-collapse border border-blue-600 rounded-lg">
+                  <table
+                    className={cn(
+                      "w-full border-collapse border rounded-lg",
+                      isDarkMode ? "border-blue-600" : themeColors.tableBorder
+                    )}
+                  >
                     {props.children}
                   </table>
                 </div>
@@ -751,57 +852,136 @@ Tab - Indent in code blocks`;
             },
             th(props) {
               return (
-                <th className="border border-blue-600 px-4 py-2 bg-blue-800/60 font-semibold text-left text-white">
+                <th
+                  className={cn(
+                    "border px-4 py-2 font-semibold text-left",
+                    isDarkMode
+                      ? "border-blue-600 bg-blue-900/60 text-white"
+                      : cn(
+                          themeColors.tableBorder,
+                          themeColors.tableHeaderBg,
+                          themeColors.tableHeaderText
+                        )
+                  )}
+                >
                   {props.children}
                 </th>
               );
             },
             td(props) {
               return (
-                <td className="border border-blue-600 px-4 py-2 text-white">
+                <td
+                  className={cn(
+                    "border px-4 py-2",
+                    isDarkMode
+                      ? "border-blue-600 text-gray-100"
+                      : cn(
+                          themeColors.tableBorder,
+                          themeColors.tableText
+                        )
+                  )}
+                >
                   {props.children}
                 </td>
               );
             },
             ul(props) {
               return (
-                <ul className="list-disc list-inside space-y-1 text-white">
+                <ul
+                  className={cn(
+                    "list-disc list-inside space-y-1",
+                    isDarkMode ? "text-gray-100" : themeColors.text
+                  )}
+                >
                   {props.children}
                 </ul>
               );
             },
             ol(props) {
               return (
-                <ol className="list-decimal list-inside space-y-1 text-white">
+                <ol
+                  className={cn(
+                    "list-decimal list-inside space-y-1",
+                    isDarkMode ? "text-gray-100" : themeColors.text
+                  )}
+                >
                   {props.children}
                 </ol>
               );
             },
             li(props) {
-              return <li className="text-white">{props.children}</li>;
+              return (
+                <li className={isDarkMode ? "text-gray-100" : themeColors.text}>
+                  {props.children}
+                </li>
+              );
             },
             h1(props) {
-              return <h1 className="text-white font-bold">{props.children}</h1>;
+              return (
+                <h1
+                  className={cn(
+                    "font-bold",
+                    isDarkMode ? "text-white" : themeColors.text
+                  )}
+                >
+                  {props.children}
+                </h1>
+              );
             },
             h2(props) {
-              return <h2 className="text-white font-bold">{props.children}</h2>;
+              return (
+                <h2
+                  className={cn(
+                    "font-bold",
+                    isDarkMode ? "text-white" : themeColors.text
+                  )}
+                >
+                  {props.children}
+                </h2>
+              );
             },
             h3(props) {
-              return <h3 className="text-white font-bold">{props.children}</h3>;
+              return (
+                <h3
+                  className={cn(
+                    "font-bold",
+                    isDarkMode ? "text-white" : themeColors.text
+                  )}
+                >
+                  {props.children}
+                </h3>
+              );
             },
           }}
         >
           {content}
         </ReactMarkdown>
       ) : (
-        <div className="text-blue-200/60 italic text-center py-12">
+        <div
+          className={cn(
+            "italic text-center py-12",
+            isDarkMode ? "text-blue-200/60" : "text-gray-400"
+          )}
+        >
           <div className="text-4xl mb-4">✨</div>
-          <p className="text-blue-200">
+          <p className={isDarkMode ? "text-blue-200" : "text-gray-600"}>
             Start typing to see your content come to life...
           </p>
-          <p className="text-sm mt-2 text-blue-300/70">
+          <p
+            className={cn(
+              "text-sm mt-2",
+              isDarkMode ? "text-blue-300/70" : "text-gray-500"
+            )}
+          >
             Use{" "}
-            <code className="bg-blue-800/60 px-2 py-1 rounded text-white">
+            <code
+              className={cn(
+                "px-2 py-1 rounded",
+                isDarkMode
+                  ? "bg-blue-800/60 text-white"
+                  : cn(themeColors.codeBg, themeColors.codeText)
+              )}
+            >
               /
             </code>{" "}
             commands for quick formatting
@@ -811,18 +991,122 @@ Tab - Indent in code blocks`;
     </article>
   );
 
+  const ThemeSelector = () => (
+    <div className="absolute z-20 right-0 mt-2 w-36">
+      <div
+        className={cn(
+          "rounded-lg shadow-lg border",
+          isDarkMode
+            ? "bg-slate-800 border-slate-700"
+            : "bg-white border-gray-200"
+        )}
+      >
+        <button
+          onClick={() => {
+            setColorTheme("light");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 rounded-t-lg",
+            colorTheme === "light" &&
+              (isDarkMode ? "bg-slate-700" : "bg-indigo-100"),
+            isDarkMode ? "text-white" : "text-gray-900"
+          )}
+        >
+          Indigo
+        </button>
+        <button
+          onClick={() => {
+            setColorTheme("nord");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t",
+            colorTheme === "nord" &&
+              (isDarkMode ? "bg-slate-700" : "bg-slate-100"),
+            isDarkMode
+              ? "text-white border-slate-700"
+              : "text-gray-900 border-gray-200"
+          )}
+        >
+          Nord
+        </button>
+        <button
+          onClick={() => {
+            setColorTheme("slate");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t",
+            colorTheme === "slate" &&
+              (isDarkMode ? "bg-slate-700" : "bg-emerald-100"),
+            isDarkMode
+              ? "text-white border-slate-700"
+              : "text-gray-900 border-gray-200"
+          )}
+        >
+          Emerald
+        </button>
+        <button
+          onClick={() => {
+            setColorTheme("ocean");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t rounded-b-lg",
+            colorTheme === "ocean" &&
+              (isDarkMode ? "bg-slate-700" : "bg-cyan-100"),
+            isDarkMode
+              ? "text-white border-slate-700"
+              : "text-gray-900 border-gray-200"
+          )}
+        >
+          Ocean
+        </button>
+      </div>
+    </div>
+  );
+
   if (previewOnly) {
     return (
-      <div className="h-full w-full bg-gray-100 relative">
-        <div className="absolute top-4 right-4 z-10 flex gap-2">
+      <div
+        className={cn(
+          "h-full w-full relative",
+          isDarkMode ? "bg-slate-900" : themeColors.bg
+        )}
+      >
+        <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
+          <div className="relative">
+            <Button
+              onClick={() => setShowThemeMenu(!showThemeMenu)}
+              className="text-white bg-slate-700 hover:bg-slate-600"
+              size="sm"
+            >
+              <Palette className="h-4 w-4 mr-2" />
+              Theme
+            </Button>
+            {showThemeMenu && <ThemeSelector />}
+          </div>
+          <Button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className="text-white bg-slate-700 hover:bg-slate-600"
+            size="sm"
+          >
+            {isDarkMode ? (
+              <Sun className="h-4 w-4 mr-2" />
+            ) : (
+              <Moon className="h-4 w-4 mr-2" />
+            )}
+            {isDarkMode ? "Light" : "Dark"}
+          </Button>
           <Button
             onClick={exportToPDF}
             disabled={isExporting || !content.trim()}
-            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
             size="sm"
           >
             <Download className="h-4 w-4 mr-2" />
-            {isExporting ? 'Exporting...' : 'Export PDF'}
+            {isExporting ? "Exporting..." : "Export PDF"}
           </Button>
           <Button
             onClick={() => setPreviewOnly(false)}
@@ -833,7 +1117,14 @@ Tab - Indent in code blocks`;
             Edit Mode
           </Button>
         </div>
-        <Card className="h-full overflow-y-auto bg-gradient-to-br from-slate-900/80 to-blue-900/60 border-blue-600/30 backdrop-blur-sm">
+        <Card
+          className={cn(
+            "h-full overflow-y-auto border-0",
+            isDarkMode
+              ? "bg-slate-900"
+              : cn(themeColors.cardBg, themeColors.cardBorder)
+          )}
+        >
           <PreviewContent />
         </Card>
       </div>
@@ -841,8 +1132,13 @@ Tab - Indent in code blocks`;
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full w-full bg-gray-100 relative">
-      {/* Hidden file input */}
+    // FIX: Added 'relative' class to correctly position the buttons.
+    <div
+      className={cn(
+        "grid grid-cols-1 md:grid-cols-2 gap-4 h-full w-full p-4 relative",
+        isDarkMode ? "bg-slate-900" : themeColors.bg
+      )}
+    >
       <input
         ref={fileInputRef}
         type="file"
@@ -850,8 +1146,31 @@ Tab - Indent in code blocks`;
         onChange={handleImportFile}
         className="hidden"
       />
-      
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
+
+      <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
+        <div className="relative">
+          <Button
+            onClick={() => setShowThemeMenu(!showThemeMenu)}
+            className="text-white bg-slate-700 hover:bg-slate-600"
+            size="sm"
+          >
+            <Palette className="h-4 w-4 mr-2" />
+            Theme
+          </Button>
+          {showThemeMenu && <ThemeSelector />}
+        </div>
+        <Button
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          className="text-white bg-slate-700 hover:bg-slate-600"
+          size="sm"
+        >
+          {isDarkMode ? (
+            <Sun className="h-4 w-4 mr-2" />
+          ) : (
+            <Moon className="h-4 w-4 mr-2" />
+          )}
+          {isDarkMode ? "Light" : "Dark"}
+        </Button>
         <Button
           onClick={triggerFileImport}
           className="bg-purple-600 hover:bg-purple-700 text-white"
@@ -863,11 +1182,11 @@ Tab - Indent in code blocks`;
         <Button
           onClick={exportToPDF}
           disabled={isExporting || !content.trim()}
-          className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
           size="sm"
         >
           <Download className="h-4 w-4 mr-2" />
-          {isExporting ? 'Exporting...' : 'Export PDF'}
+          {isExporting ? "Exporting..." : "Export PDF"}
         </Button>
         <Button
           onClick={() => setPreviewOnly(true)}
@@ -878,18 +1197,29 @@ Tab - Indent in code blocks`;
           Preview Only
         </Button>
       </div>
-      
-      {/* Input Pane with Light Theme */}
-      <Card className="flex flex-col h-full bg-white border-gray-200 shadow-sm">
+
+      <Card
+        className={cn(
+          "flex flex-col h-full border shadow-lg mt-12 md:mt-0",
+          isDarkMode
+            ? "bg-slate-800 border-slate-700"
+            : cn(themeColors.cardBg, themeColors.cardBorder)
+        )}
+      >
         <div className="relative flex-grow">
           <Textarea
             ref={textareaRef}
             value={content}
-            onChange={() => {}} // Handled by onInput
+            onChange={() => {}}
             onInput={handleInput}
             onKeyDown={handleKeyDown}
             onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
-            className="w-full h-full p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm leading-relaxed bg-transparent text-gray-800 placeholder:text-gray-400"
+            className={cn(
+              "absolute inset-0 w-full h-full p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm leading-relaxed bg-transparent",
+              isDarkMode
+                ? "text-gray-100 placeholder:text-gray-500"
+                : cn(themeColors.text, "placeholder:text-gray-400")
+            )}
             placeholder=""
             style={{
               minHeight: "100%",
@@ -898,16 +1228,32 @@ Tab - Indent in code blocks`;
                 'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Inconsolata, "Roboto Mono", monospace',
             }}
           />
-          {/* Enhanced placeholder overlay when empty */}
           {!content.trim() && (
-            <div className="absolute inset-4 pointer-events-none text-gray-400 text-sm leading-relaxed whitespace-pre-line font-mono">
+            <div
+              className={cn(
+                "absolute inset-4 pointer-events-none text-sm leading-relaxed whitespace-pre-line font-mono",
+                isDarkMode ? "text-gray-500" : "text-gray-400"
+              )}
+            >
               {getPlaceholderText()}
             </div>
           )}
         </div>
-        <CardFooter className="py-2 px-4 border-t border-gray-200 bg-gray-50">
+        <CardFooter
+          className={cn(
+            "py-2 px-4 border-t",
+            isDarkMode
+              ? "border-gray-700 bg-slate-900/50"
+              : cn(themeColors.cardBorder, "bg-white/50")
+          )}
+        >
           <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2 text-xs text-gray-600">
+            <div
+              className={cn(
+                "flex items-center gap-2 text-xs",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}
+            >
               <div
                 className={cn(
                   "h-2 w-2 rounded-full",
@@ -916,7 +1262,12 @@ Tab - Indent in code blocks`;
               />
               <span>{isConnected ? "Connected" : "Disconnected"}</span>
             </div>
-            <div className="text-xs text-gray-600">
+            <div
+              className={cn(
+                "text-xs",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}
+            >
               {content.length} chars | Line{" "}
               {content.substring(0, cursorPosition).split("\n").length}
             </div>
@@ -924,8 +1275,14 @@ Tab - Indent in code blocks`;
         </CardFooter>
       </Card>
 
-      {/* Enhanced Preview Pane with Dark Theme and Blue Gradient Background */}
-      <Card className="h-full overflow-y-auto bg-gradient-to-br from-slate-900/80 to-blue-900/60 border-blue-600/30 backdrop-blur-sm">
+      <Card
+        className={cn(
+          "h-full overflow-y-auto border backdrop-blur-sm shadow-lg",
+          isDarkMode
+            ? "bg-gradient-to-br from-slate-900/95 to-blue-900/70 border-blue-600/30"
+            : cn(themeColors.cardBg, themeColors.cardBorder)
+        )}
+      >
         <PreviewContent />
       </Card>
     </div>
