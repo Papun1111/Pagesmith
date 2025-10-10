@@ -161,7 +161,7 @@ export default function DashboardPage() {
       >
         {/* Responsive header padding */}
         <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 md:px-8 bg-[#F0F0F0]/80 backdrop-blur-sm border-b border-black">
-          <Link href="/" className="text-xl sm:text-2xl font-black cursor-pointer">
+          <Link href="/" className="text-xl sm:text-2xl text-black font-black cursor-pointer">
             PageSmith
           </Link>
           <Skeleton className="h-12 w-12 sm:w-48 bg-gray-300" />
