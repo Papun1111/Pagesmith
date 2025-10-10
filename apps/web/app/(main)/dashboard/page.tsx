@@ -14,7 +14,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "motion/react"; // Corrected import for staggerChildren
 
 const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
   <motion.div
@@ -29,10 +29,11 @@ const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
     }}
   >
     {canvases.map((canvas) => (
-      <a
+      <Link
         href={`/canvas/${canvas._id}`}
         key={canvas._id}
         className="no-underline text-inherit"
+        passHref
       >
         <motion.div
           className="border border-black p-4 h-48 flex flex-col justify-between group cursor-pointer hover:bg-black hover:text-white transition-colors"
@@ -42,7 +43,8 @@ const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
           }}
         >
           <div>
-            <h3 className="font-black text-xl truncate flex items-start gap-2">
+            {/* Responsive text size for card title */}
+            <h3 className="font-black text-lg sm:text-xl truncate flex items-start gap-2">
               <FileText className="h-5 w-5 mt-1 flex-shrink-0" />
               <span className="truncate">{canvas.title}</span>
             </h3>
@@ -54,16 +56,17 @@ const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
             <ArrowUpRight className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </motion.div>
-      </a>
+      </Link>
     ))}
   </motion.div>
 );
 
 const DashboardSkeleton = () => (
+  // Responsive main content padding
   <div className="md:ml-16 pt-28 p-4 md:p-8 space-y-12">
     <div className="flex items-center justify-between">
-      <Skeleton className="h-10 w-64 bg-gray-300" />
-      <Skeleton className="h-12 w-48 bg-gray-300" />
+      <Skeleton className="h-10 w-48 sm:w-64 bg-gray-300" />
+      <Skeleton className="h-12 w-12 sm:w-48 bg-gray-300" />
     </div>
     <div className="space-y-12">
       <div>
@@ -135,7 +138,6 @@ export default function DashboardPage() {
         { title: "Untitled Canvas" },
         token
       );
-      // In a real app, this would also update the local state or refetch
       setCanvases((prev) => [...prev, newCanvas]);
       router.push(`/canvas/${newCanvas._id}`);
     } catch (err: unknown) {
@@ -157,13 +159,15 @@ export default function DashboardPage() {
         style={{ fontFamily: "'Poppins', sans-serif" }}
         className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen"
       >
-        <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 px-8 bg-[#F0F0F0]/80 backdrop-blur-sm border-b border-black">
-          <Link href="/" className="text-2xl font-black cursor-pointer">
+        {/* Responsive header padding */}
+        <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 md:px-8 bg-[#F0F0F0]/80 backdrop-blur-sm border-b border-black">
+          <Link href="/" className="text-xl sm:text-2xl font-black cursor-pointer">
             PageSmith
           </Link>
-          <Skeleton className="h-12 w-48 bg-gray-300" />
+          <Skeleton className="h-12 w-12 sm:w-48 bg-gray-300" />
         </header>
-        <div className="fixed top-0 left-0 z-40 h-full hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0]">
+        {/* Added explicit width to vertical sidebar */}
+        <div className="fixed top-0 left-0 z-40 h-full w-16 hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0]">
           <span className="font-black text-xl [writing-mode:vertical-rl] tracking-widest uppercase">
             Dashboard
           </span>
@@ -178,26 +182,33 @@ export default function DashboardPage() {
       style={{ fontFamily: "'Poppins', sans-serif" }}
       className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen"
     >
-      <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 px-8 bg-[#F0F0F0]/80 backdrop-blur-sm border-b border-black">
-        <Link href="/" className="text-2xl font-black cursor-pointer">
+      {/* Responsive header padding */}
+      <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 md:px-8 bg-[#F0F0F0]/80 backdrop-blur-sm border-b border-black">
+        <Link href="/" className="text-xl sm:text-2xl font-black cursor-pointer">
           PageSmith
         </Link>
         <Button
           onClick={handleCreateNewCanvas}
           disabled={isCreating}
-          className="bg-black text-white rounded-none hover:bg-black/80 px-6 py-6 font-bold"
+          // Responsive button padding and size
+          className="bg-black text-white rounded-none hover:bg-black/80 px-3 sm:px-6 py-3 sm:py-6 font-bold flex items-center"
         >
-          <PlusCircle className="mr-2 h-5 w-5" />
-          {isCreating ? "Creating..." : "Create Canvas"}
+          <PlusCircle className="h-5 w-5 sm:mr-2" />
+          {/* Hide text on small screens */}
+          <span className="hidden sm:inline">
+            {isCreating ? "Creating..." : "Create Canvas"}
+          </span>
         </Button>
       </header>
 
-      <div className="fixed top-0 left-0 z-40 h-full hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0]">
+      {/* Added explicit width to vertical sidebar */}
+      <div className="fixed top-0 left-0 z-40 h-full w-16 hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0]">
         <span className="font-black text-xl [writing-mode:vertical-rl] tracking-widest uppercase">
           Dashboard
         </span>
       </div>
 
+      {/* Responsive main content padding */}
       <div className="md:ml-16 pt-28 p-4 md:p-8 space-y-12">
         {error && (
           <div className="flex items-center gap-4 border border-red-500 bg-red-100 p-4 text-red-700 font-bold">
@@ -207,14 +218,16 @@ export default function DashboardPage() {
         )}
 
         <section>
-          <h2 className="text-4xl font-black mb-4 flex items-center gap-3">
+          {/* Responsive heading size */}
+          <h2 className="text-3xl md:text-4xl font-black mb-4 flex items-center gap-3">
             My Canvases
           </h2>
           {ownedCanvases.length > 0 ? (
             <CanvasGrid canvases={ownedCanvases} />
           ) : (
             <div className="text-center py-16 border-2 border-dashed border-black">
-              <h3 className="text-2xl font-black">NO CANVASES... YET.</h3>
+              {/* Responsive heading size */}
+              <h3 className="text-xl md:text-2xl font-black">NO CANVASES... YET.</h3>
               <p className="text-black/70 mt-2">
                 Click &quot;Create Canvas&quot; to start a new project.
               </p>
@@ -223,14 +236,16 @@ export default function DashboardPage() {
         </section>
 
         <section>
-          <h2 className="text-4xl font-black mb-4 flex items-center gap-3">
+          {/* Responsive heading size */}
+          <h2 className="text-3xl md:text-4xl font-black mb-4 flex items-center gap-3">
             Shared With Me
           </h2>
           {sharedCanvases.length > 0 ? (
             <CanvasGrid canvases={sharedCanvases} />
           ) : (
             <div className="text-center py-16 border-2 border-dashed border-black">
-              <h3 className="text-2xl font-black">NOTHING TO SEE HERE.</h3>
+              {/* Responsive heading size */}
+              <h3 className="text-xl md:text-2xl font-black">NOTHING TO SEE HERE.</h3>
               <p className="text-black/70 mt-2">
                 When someone shares a canvas, it will appear here.
               </p>

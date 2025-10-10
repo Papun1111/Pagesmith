@@ -1,16 +1,22 @@
 import Link from 'next/link';
 import { UserProfileButton } from './UserProfileButton';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu } from 'lucide-react';
+// Sheet components are no longer needed in the header
+// import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+// import { Menu } from 'lucide-react';
+
+// The Sidebar import is kept if other logic depends on it, but it's not rendered here.
+// For the mobile menu to appear, <Sidebar /> should be placed in your main layout file.
 import { Sidebar } from './Sidebar';
 
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-[#F0F0F0]">
-      <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-6">
+    // Added border-black for theme consistency
+    <header className="sticky top-0 z-40 w-full border-b border-black bg-[#F0F0F0]">
+      {/* Added responsive padding */}
+      <div className="container flex h-16 items-center justify-between px-4 sm:px-6">
+        {/* Added responsive gap */}
+        <div className="flex items-center gap-4 md:gap-6">
           <Link href="/" className="flex items-center gap-2">
             {/* Replace with your actual logo */}
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
@@ -19,37 +25,31 @@ export function Header() {
             </svg>
             <span className="font-bold">PageSmith</span>
           </Link>
-         
+          
           <nav className="hidden md:flex items-center gap-4 text-sm font-medium">
-            <Link href="/dashboard" className="text-muted-foreground transition-colors hover:text-foreground">
+            {/* Updated text colors for theme consistency */}
+            <Link href="/dashboard" className="text-black/70 transition-colors hover:text-black">
               Dashboard
             </Link>
-            <Link href="/pricing" className="text-muted-foreground transition-colors hover:text-foreground">
+            <Link href="/pricing" className="text-black/70 transition-colors hover:text-black">
               Pricing
             </Link>
-             <Link href="/settings/billing" className="text-muted-foreground transition-colors hover:text-foreground">
+             <Link href="/settings/billing" className="text-black/70 transition-colors hover:text-black">
               Upgrade Plans
             </Link>
           </nav>
         </div>
 
-        <div className="flex items-center gap-4">
-          {/* User Profile Button */}
-          <UserProfileButton  />
+        {/* The gap here is also responsive */}
+        <div className="flex items-center gap-2 sm:gap-4">
+          <UserProfileButton />
           
-          {/* Mobile Menu */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle Menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0">
-              {/* Reuse the Sidebar component for the mobile menu */}
-              <Sidebar />
-            </SheetContent>
-          </Sheet>
+          {/* The Sheet component has been removed from the header.
+            The Sidebar component you provided earlier already contains its own logic 
+            to show a hamburger menu on mobile and slide out. To see it,
+            you should render the <Sidebar /> component once in your main app layout,
+            typically alongside your main content area.
+          */}
         </div>
       </div>
     </header>
