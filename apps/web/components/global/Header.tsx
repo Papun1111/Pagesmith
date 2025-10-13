@@ -3,7 +3,7 @@ import { UserProfileButton } from './UserProfileButton';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu } from 'lucide-react';
-import { Sidebar } from './Sidebar';
+
 
 
 export function Header() {
@@ -17,7 +17,7 @@ export function Header() {
               <path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z" />
               <path d="M15 3v6h6" />
             </svg>
-            <span className="font-bold text-black">PageSmith</span>
+            <span className="font-bold text-black dark:text-black">PageSmith</span>
           </Link>
          
           <nav className="hidden md:flex items-center gap-4 text-sm font-medium">
@@ -45,10 +45,6 @@ export function Header() {
                 <span className="sr-only">Toggle Menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0">
-              {/* Reuse the Sidebar component for the mobile menu */}
-              <Sidebar />
-            </SheetContent>
           </Sheet>
         </div>
       </div>

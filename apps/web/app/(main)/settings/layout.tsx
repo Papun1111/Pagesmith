@@ -1,10 +1,6 @@
 import React from 'react';
 
-/**
- * A layout component that wraps all pages within the settings section.
- * It provides a consistent container with padding and a main heading
- * for a unified look and feel across all settings pages (e.g., Billing, Profile).
- */
+
 export default function SettingsLayout({
   children,
 }: {
@@ -19,7 +15,7 @@ export default function SettingsLayout({
             Manage your account settings and preferences.
           </p>
         </div>
-        {/* The content of the specific settings page (e.g., BillingPage) will be rendered here */}
+
         {children}
       </div>
     </div>

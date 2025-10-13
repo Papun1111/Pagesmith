@@ -159,14 +159,14 @@ export default function DashboardPage() {
         style={{ fontFamily: "'Poppins', sans-serif" }}
         className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen"
       >
-        {/* Responsive header padding */}
+
         <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 md:px-8 bg-[#F0F0F0]/80 backdrop-blur-sm border-b border-black">
           <Link href="/" className="text-xl sm:text-2xl text-black font-black cursor-pointer">
             PageSmith
           </Link>
           <Skeleton className="h-12 w-12 sm:w-48 bg-gray-300" />
         </header>
-        {/* Added explicit width to vertical sidebar */}
+     
         <div className="fixed top-0 left-0 z-40 h-full w-16 hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0]">
           <span className="font-black text-xl [writing-mode:vertical-rl] tracking-widest uppercase">
             Dashboard

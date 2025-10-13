@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-// UPDATED: Using themes with better readability for light and dark modes
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
   Copy,
@@ -60,7 +59,7 @@ interface ThemeColors {
   cardBorder: string;
 }
 
-// REFINED: Themes now apply colors to the editor/preview cards, not just the background.
+// Light mode themes
 const lightThemes: Record<ColorTheme, ThemeColors> = {
   light: {
     bg: "bg-indigo-100",
@@ -144,9 +143,90 @@ const lightThemes: Record<ColorTheme, ThemeColors> = {
   },
 };
 
-/**
- * Copy button component for code blocks
- */
+// Dark mode themes
+const darkThemes: Record<ColorTheme, ThemeColors> = {
+  light: {
+    bg: "bg-indigo-950",
+    text: "text-indigo-100",
+    codeBlockBg: "#1e1b4b",
+    codeBg: "bg-indigo-900",
+    codeBorder: "border-indigo-700",
+    codeText: "text-indigo-200",
+    blockquoteBg: "bg-indigo-900",
+    blockquoteBorder: "border-indigo-500",
+    blockquoteText: "text-indigo-200",
+    linkColor: "text-indigo-400",
+    linkHover: "hover:text-indigo-300",
+    tableBg: "bg-indigo-900",
+    tableBorder: "border-indigo-700",
+    tableHeaderBg: "bg-indigo-800",
+    tableHeaderText: "text-indigo-100",
+    tableText: "text-indigo-100",
+    cardBg: "bg-indigo-900",
+    cardBorder: "border-indigo-800",
+  },
+  nord: {
+    bg: "bg-slate-900",
+    text: "text-slate-100",
+    codeBlockBg: "#1e293b",
+    codeBg: "bg-slate-800",
+    codeBorder: "border-slate-600",
+    codeText: "text-slate-200",
+    blockquoteBg: "bg-slate-800",
+    blockquoteBorder: "border-slate-500",
+    blockquoteText: "text-slate-200",
+    linkColor: "text-cyan-400",
+    linkHover: "hover:text-cyan-300",
+    tableBg: "bg-slate-800",
+    tableBorder: "border-slate-600",
+    tableHeaderBg: "bg-slate-700",
+    tableHeaderText: "text-slate-100",
+    tableText: "text-slate-100",
+    cardBg: "bg-slate-800",
+    cardBorder: "border-slate-700",
+  },
+  slate: {
+    bg: "bg-emerald-950",
+    text: "text-emerald-100",
+    codeBlockBg: "#022c22",
+    codeBg: "bg-emerald-900",
+    codeBorder: "border-emerald-700",
+    codeText: "text-emerald-200",
+    blockquoteBg: "bg-emerald-900",
+    blockquoteBorder: "border-emerald-600",
+    blockquoteText: "text-emerald-200",
+    linkColor: "text-teal-400",
+    linkHover: "hover:text-teal-300",
+    tableBg: "bg-emerald-900",
+    tableBorder: "border-emerald-700",
+    tableHeaderBg: "bg-emerald-800",
+    tableHeaderText: "text-emerald-100",
+    tableText: "text-emerald-100",
+    cardBg: "bg-emerald-900",
+    cardBorder: "border-emerald-800",
+  },
+  ocean: {
+    bg: "bg-cyan-950",
+    text: "text-cyan-100",
+    codeBlockBg: "#083344",
+    codeBg: "bg-cyan-900",
+    codeBorder: "border-cyan-700",
+    codeText: "text-cyan-200",
+    blockquoteBg: "bg-cyan-900",
+    blockquoteBorder: "border-blue-500",
+    blockquoteText: "text-cyan-200",
+    linkColor: "text-blue-400",
+    linkHover: "hover:text-blue-300",
+    tableBg: "bg-cyan-900",
+    tableBorder: "border-cyan-700",
+    tableHeaderBg: "bg-cyan-800",
+    tableHeaderText: "text-cyan-100",
+    tableText: "text-cyan-100",
+    cardBg: "bg-cyan-900",
+    cardBorder: "border-cyan-800",
+  },
+};
+
 function CopyButton({
   content,
   isDarkMode,
@@ -158,6 +238,7 @@ function CopyButton({
   theme: ColorTheme;
 }) {
   const [copied, setCopied] = useState(false);
+  const themeColors = isDarkMode ? darkThemes[theme] : lightThemes[theme];
 
   const handleCopy = async () => {
     try {
@@ -192,7 +273,7 @@ function CopyButton({
         <Copy
           className={cn(
             "h-3 w-3",
-            isDarkMode ? "text-white" : lightThemes[theme]?.codeText
+            isDarkMode ? "text-white" : themeColors.codeText
           )}
         />
       )}
@@ -200,9 +281,6 @@ function CopyButton({
   );
 }
 
-/**
- * Enhanced code block component with copy functionality
- */
 function CodeBlock({
   children,
   className,
@@ -214,7 +292,7 @@ function CodeBlock({
   const language = match ? match[1] : "";
   const isInline = !match;
   const content = String(children || "").replace(/\n$/, "");
-  const themeColors = lightThemes[theme];
+  const themeColors = isDarkMode ? darkThemes[theme] : lightThemes[theme];
 
   if (isInline) {
     return (
@@ -295,11 +373,6 @@ function extractTextContent(node: ReactNode): string {
   return "";
 }
 
-/**
- * The main editor component for the canvas. It now uses the `useSocket` hook
- * to manage its real-time connection and provides syntax highlighting with
- * Notion-like editing experience.
- */
 export function Editor({ canvasId, initialContent }: EditorProps) {
   const [content, setContent] = useState(initialContent);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -550,15 +623,14 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
   const getPlaceholderText = () => {
     if (!content.trim()) {
-      // ADDED: Descriptions for /md and /json commands
       return `Type '/' for commands, or start writing...
 
 Quick Commands:
-/js [space] - JavaScript code block with placeholder
-/ts [space] - TypeScript code block with placeholder  
-/py [space] - Python code block with placeholder
-/md [space] - Markdown code block with placeholder
-/json [space] - JSON code block with placeholder
+/js [space] - JavaScript code block
+/ts [space] - TypeScript code block  
+/py [space] - Python code block
+/md [space] - Markdown code block
+/json [space] - JSON code block
 /code [space] - Generic code block
 /h1, /h2, /h3 [space] - Headers
 /quote [space] - Quote block
@@ -569,7 +641,7 @@ Shortcuts:
 Cmd/Ctrl + B - Bold
 Cmd/Ctrl + I - Italic
 Cmd/Ctrl + K - Link
-Tab - Indent in code blocks`;
+Tab - Indent`;
     }
     return "Continue writing...";
   };
@@ -581,7 +653,6 @@ Tab - Indent in code blocks`;
 
     try {
       const clonedContent = previewRef.current.cloneNode(true) as HTMLElement;
-
       const buttons = clonedContent.querySelectorAll("button");
       buttons.forEach((btn) => btn.remove());
 
@@ -614,8 +685,8 @@ Tab - Indent in code blocks`;
       });
 
       const previewContent = clonedContent.innerHTML;
-
       const printWindow = window.open("", "_blank");
+      
       if (!printWindow) {
         throw new Error("Please allow pop-ups to export PDF");
       }
@@ -627,12 +698,7 @@ Tab - Indent in code blocks`;
             <meta charset="utf-8">
             <title>Canvas Export - ${canvasId}</title>
             <style>
-              * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-              }
-              
+              * { margin: 0; padding: 0; box-sizing: border-box; }
               body {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 line-height: 1.6;
@@ -642,31 +708,21 @@ Tab - Indent in code blocks`;
                 max-width: 800px;
                 margin: 0 auto;
               }
-              
-              h1 { font-size: 2em; margin: 1em 0 0.5em 0; font-weight: bold; color: rgb(0, 0, 0); }
-              h2 { font-size: 1.5em; margin: 0.83em 0 0.5em 0; font-weight: bold; color: rgb(0, 0, 0); }
-              h3 { font-size: 1.17em; margin: 1em 0 0.5em 0; font-weight: bold; color: rgb(0, 0, 0); }
-              p { margin: 1em 0; color: rgb(26, 26, 26); }
-              strong { font-weight: bold; color: rgb(0, 0, 0); }
-              em { font-style: italic; color: rgb(26, 26, 26); }
-              a { color: rgb(0, 102, 204); text-decoration: underline; }
-              code { background: rgb(245, 245, 245); padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; color: rgb(0, 0, 0); border: 1px solid rgb(221, 221, 221); }
-              pre { background: rgb(245, 245, 245); padding: 16px; border-radius: 6px; overflow-x: auto; margin: 1em 0; border: 1px solid rgb(221, 221, 221); }
-              pre code { background: none; padding: 0; color: rgb(0, 0, 0); border: none; }
-              blockquote { border-left: 4px solid rgb(0, 102, 204); padding-left: 16px; margin: 1em 0; color: rgb(85, 85, 85); font-style: italic; background: rgb(250, 250, 250); padding: 12px 12px 12px 16px; border-radius: 0 4px 4px 0; }
-              ul, ol { margin: 1em 0; padding-left: 2em; }
-              li { margin: 0.5em 0; color: rgb(26, 26, 26); }
-              table { border-collapse: collapse; width: 100%; margin: 1em 0; border: 1px solid rgb(221, 221, 221); }
-              th, td { border: 1px solid rgb(221, 221, 221); padding: 12px; text-align: left; color: rgb(26, 26, 26); }
-              th { background: rgb(245, 245, 245); font-weight: bold; color: rgb(0, 0, 0); }
+              h1 { font-size: 2em; margin: 1em 0 0.5em 0; font-weight: bold; }
+              h2 { font-size: 1.5em; margin: 0.83em 0 0.5em 0; font-weight: bold; }
+              h3 { font-size: 1.17em; margin: 1em 0 0.5em 0; font-weight: bold; }
+              p { margin: 1em 0; }
+              code { background: rgb(245, 245, 245); padding: 2px 6px; border-radius: 3px; }
+              pre { background: rgb(245, 245, 245); padding: 16px; border-radius: 6px; overflow-x: auto; margin: 1em 0; }
+              blockquote { border-left: 4px solid rgb(0, 102, 204); padding-left: 16px; margin: 1em 0; }
+              table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+              th, td { border: 1px solid rgb(221, 221, 221); padding: 12px; text-align: left; }
+              th { background: rgb(245, 245, 245); font-weight: bold; }
               button { display: none !important; }
-              svg { display: inline-block; vertical-align: middle; }
               @media print { body { padding: 20px; } @page { margin: 2cm; } }
             </style>
           </head>
-          <body>
-            ${previewContent}
-          </body>
+          <body>${previewContent}</body>
         </html>
       `;
 
@@ -691,26 +747,103 @@ Tab - Indent in code blocks`;
     }
   };
 
-  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
+    const fileName = file.name;
+    const fileExtension = fileName.split('.').pop()?.toLowerCase();
 
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      if (text) {
-        setContent(text);
-        isLocalChange.current = true;
+    try {
+      let importedContent = "";
+
+      // Handle PDF files
+      if (fileExtension === 'pdf') {
+        // For PDFs, we need a library like pdf.js
+        // Since we can't install it here, we'll show a message
+        alert("PDF import requires pdf.js library. Please install it in your project:\nnpm install pdfjs-dist");
+        return;
       }
-    };
 
-    reader.onerror = () => {
-      alert("Failed to read file. Please try again.");
-    };
+      // Handle code and text files
+      const validExtensions = ['txt', 'md', 'markdown', 'js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'rs', 'go', 'yml', 'yaml', 'json', 'xml', 'html', 'css', 'scss'];
+      
+      if (validExtensions.includes(fileExtension || '')) {
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+          const text = e.target?.result as string;
+          if (text) {
+            const textarea = textareaRef.current;
+            if (!textarea) {
+              setContent(text);
+              isLocalChange.current = true;
+              return;
+            }
 
-    reader.readAsText(file);
+            // Get language identifier for code blocks
+            const languageMap: Record<string, string> = {
+              'js': 'javascript',
+              'jsx': 'javascript',
+              'ts': 'typescript',
+              'tsx': 'typescript',
+              'py': 'python',
+              'java': 'java',
+              'cpp': 'cpp',
+              'c': 'c',
+              'h': 'c',
+              'rs': 'rust',
+              'go': 'go',
+              'yml': 'yaml',
+              'yaml': 'yaml',
+              'json': 'json',
+              'xml': 'xml',
+              'html': 'html',
+              'css': 'css',
+              'scss': 'scss',
+            };
 
+            const language = languageMap[fileExtension || ''] || fileExtension;
+            
+            // Format as code block if it's a code file
+            if (language && !['txt', 'md', 'markdown'].includes(fileExtension || '')) {
+              importedContent = `\n\n\`\`\`${language}\n${text}\n\`\`\`\n\n`;
+            } else {
+              importedContent = `\n\n${text}\n\n`;
+            }
+
+            // Insert at cursor position instead of overriding
+            const { selectionStart } = textarea;
+            const beforeCursor = content.substring(0, selectionStart);
+            const afterCursor = content.substring(selectionStart);
+            const newContent = beforeCursor + importedContent + afterCursor;
+            
+            setContent(newContent);
+            isLocalChange.current = true;
+
+            // Set cursor position after imported content
+            setTimeout(() => {
+              const newPosition = selectionStart + importedContent.length;
+              textarea.selectionStart = textarea.selectionEnd = newPosition;
+              textarea.focus();
+            }, 0);
+          }
+        };
+
+        reader.onerror = () => {
+          alert("Failed to read file. Please try again.");
+        };
+
+        reader.readAsText(file);
+      } else {
+        alert(`Unsupported file type: .${fileExtension}\n\nSupported formats:\n- Text: .txt, .md, .markdown\n- Code: .js, .jsx, .ts, .tsx, .py, .java, .cpp, .c, .h, .rs, .go\n- Config: .yml, .yaml, .json, .xml\n- Web: .html, .css, .scss`);
+      }
+    } catch (error) {
+      console.error("Failed to import file:", error);
+      alert("Failed to import file. Please try again.");
+    }
+
+    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -720,13 +853,13 @@ Tab - Indent in code blocks`;
     fileInputRef.current?.click();
   };
 
-  const themeColors = lightThemes[colorTheme];
+  const themeColors = isDarkMode ? darkThemes[colorTheme] : lightThemes[colorTheme];
 
   const PreviewContent = () => (
     <article
       ref={previewRef}
       className={cn(
-        "prose max-w-none p-6",
+        "prose max-w-none p-4 sm:p-6",
         isDarkMode
           ? "prose-invert prose-headings:text-white prose-p:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-blockquote:text-gray-300"
           : ""
@@ -1007,10 +1140,10 @@ Tab - Indent in code blocks`;
             setShowThemeMenu(false);
           }}
           className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 rounded-t-lg",
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 rounded-t-lg transition-colors",
             colorTheme === "light" &&
               (isDarkMode ? "bg-slate-700" : "bg-indigo-100"),
-            isDarkMode ? "text-white" : "text-gray-900"
+            isDarkMode ? "text-white hover:bg-slate-700" : "text-gray-900 hover:bg-gray-100"
           )}
         >
           Indigo
@@ -1021,12 +1154,12 @@ Tab - Indent in code blocks`;
             setShowThemeMenu(false);
           }}
           className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t",
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
             colorTheme === "nord" &&
               (isDarkMode ? "bg-slate-700" : "bg-slate-100"),
             isDarkMode
-              ? "text-white border-slate-700"
-              : "text-gray-900 border-gray-200"
+              ? "text-white border-slate-700 hover:bg-slate-700"
+              : "text-gray-900 border-gray-200 hover:bg-gray-100"
           )}
         >
           Nord
@@ -1037,12 +1170,12 @@ Tab - Indent in code blocks`;
             setShowThemeMenu(false);
           }}
           className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t",
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
             colorTheme === "slate" &&
               (isDarkMode ? "bg-slate-700" : "bg-emerald-100"),
             isDarkMode
-              ? "text-white border-slate-700"
-              : "text-gray-900 border-gray-200"
+              ? "text-white border-slate-700 hover:bg-slate-700"
+              : "text-gray-900 border-gray-200 hover:bg-gray-100"
           )}
         >
           Emerald
@@ -1053,12 +1186,12 @@ Tab - Indent in code blocks`;
             setShowThemeMenu(false);
           }}
           className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t rounded-b-lg",
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t rounded-b-lg transition-colors",
             colorTheme === "ocean" &&
               (isDarkMode ? "bg-slate-700" : "bg-cyan-100"),
             isDarkMode
-              ? "text-white border-slate-700"
-              : "text-gray-900 border-gray-200"
+              ? "text-white border-slate-700 hover:bg-slate-700"
+              : "text-gray-900 border-gray-200 hover:bg-gray-100"
           )}
         >
           Ocean
@@ -1072,7 +1205,7 @@ Tab - Indent in code blocks`;
       <div
         className={cn(
           "h-full w-full relative",
-          isDarkMode ? "bg-slate-900" : themeColors.bg
+          isDarkMode ? themeColors.bg : themeColors.bg
         )}
       >
         <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
@@ -1082,8 +1215,8 @@ Tab - Indent in code blocks`;
               className="text-white bg-slate-700 hover:bg-slate-600"
               size="sm"
             >
-              <Palette className="h-4 w-4 mr-2" />
-              Theme
+              <Palette className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Theme</span>
             </Button>
             {showThemeMenu && <ThemeSelector />}
           </div>
@@ -1093,11 +1226,11 @@ Tab - Indent in code blocks`;
             size="sm"
           >
             {isDarkMode ? (
-              <Sun className="h-4 w-4 mr-2" />
+              <Sun className="h-4 w-4 sm:mr-2" />
             ) : (
-              <Moon className="h-4 w-4 mr-2" />
+              <Moon className="h-4 w-4 sm:mr-2" />
             )}
-            {isDarkMode ? "Light" : "Dark"}
+            <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
           </Button>
           <Button
             onClick={exportToPDF}
@@ -1105,23 +1238,23 @@ Tab - Indent in code blocks`;
             className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
             size="sm"
           >
-            <Download className="h-4 w-4 mr-2" />
-            {isExporting ? "Exporting..." : "Export PDF"}
+            <Download className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">{isExporting ? "Exporting..." : "Export PDF"}</span>
           </Button>
           <Button
             onClick={() => setPreviewOnly(false)}
             className="bg-blue-600 hover:bg-blue-700 text-white"
             size="sm"
           >
-            <Edit3 className="h-4 w-4 mr-2" />
-            Edit Mode
+            <Edit3 className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Edit</span>
           </Button>
         </div>
         <Card
           className={cn(
             "h-full overflow-y-auto border-0",
             isDarkMode
-              ? "bg-slate-900"
+              ? themeColors.cardBg
               : cn(themeColors.cardBg, themeColors.cardBorder)
           )}
         >
@@ -1132,77 +1265,76 @@ Tab - Indent in code blocks`;
   }
 
   return (
-    // FIX: Added 'relative' class to correctly position the buttons.
     <div
       className={cn(
-        "grid grid-cols-1 md:grid-cols-2 gap-4 h-full w-full p-4 relative",
-        isDarkMode ? "bg-slate-900" : themeColors.bg
+        "grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4 h-full w-full p-2 sm:p-4 relative",
+        isDarkMode ? themeColors.bg : themeColors.bg
       )}
     >
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.md,.markdown"
+        accept=".txt,.md,.markdown,.js,.jsx,.ts,.tsx,.py,.java,.cpp,.c,.h,.rs,.go,.yml,.yaml,.json,.xml,.html,.css,.scss,.pdf"
         onChange={handleImportFile}
         className="hidden"
       />
 
-      <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
+      <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-10 flex flex-wrap justify-end gap-1 sm:gap-2">
         <div className="relative">
           <Button
             onClick={() => setShowThemeMenu(!showThemeMenu)}
-            className="text-white bg-slate-700 hover:bg-slate-600"
+            className="text-white bg-slate-700 hover:bg-slate-600 h-8 sm:h-9 px-2 sm:px-3"
             size="sm"
           >
-            <Palette className="h-4 w-4 mr-2" />
-            Theme
+            <Palette className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Theme</span>
           </Button>
           {showThemeMenu && <ThemeSelector />}
         </div>
         <Button
           onClick={() => setIsDarkMode(!isDarkMode)}
-          className="text-white bg-slate-700 hover:bg-slate-600"
+          className="text-white bg-slate-700 hover:bg-slate-600 h-8 sm:h-9 px-2 sm:px-3"
           size="sm"
         >
           {isDarkMode ? (
-            <Sun className="h-4 w-4 mr-2" />
+            <Sun className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
           ) : (
-            <Moon className="h-4 w-4 mr-2" />
+            <Moon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
           )}
-          {isDarkMode ? "Light" : "Dark"}
+          <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
         </Button>
         <Button
           onClick={triggerFileImport}
-          className="bg-purple-600 hover:bg-purple-700 text-white"
+          className="bg-purple-600 hover:bg-purple-700 text-white h-8 sm:h-9 px-2 sm:px-3"
           size="sm"
         >
-          <Upload className="h-4 w-4 mr-2" />
-          Import
+          <Upload className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Import</span>
         </Button>
         <Button
           onClick={exportToPDF}
           disabled={isExporting || !content.trim()}
-          className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+          className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 h-8 sm:h-9 px-2 sm:px-3"
           size="sm"
         >
-          <Download className="h-4 w-4 mr-2" />
-          {isExporting ? "Exporting..." : "Export PDF"}
+          <Download className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+          <span className="hidden sm:inline">{isExporting ? "Exporting..." : "PDF"}</span>
         </Button>
         <Button
           onClick={() => setPreviewOnly(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          className="bg-blue-600 hover:bg-blue-700 text-white h-8 sm:h-9 px-2 sm:px-3"
           size="sm"
         >
-          <Eye className="h-4 w-4 mr-2" />
-          Preview Only
+          <Eye className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Preview</span>
         </Button>
       </div>
 
       <Card
         className={cn(
-          "flex flex-col h-full border shadow-lg mt-12 md:mt-0",
+          "flex flex-col h-full border shadow-lg mt-12 sm:mt-14 lg:mt-0",
           isDarkMode
-            ? "bg-slate-800 border-slate-700"
+            ? cn(themeColors.cardBg, themeColors.cardBorder)
             : cn(themeColors.cardBg, themeColors.cardBorder)
         )}
       >
@@ -1215,7 +1347,7 @@ Tab - Indent in code blocks`;
             onKeyDown={handleKeyDown}
             onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
             className={cn(
-              "absolute inset-0 w-full h-full p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm leading-relaxed bg-transparent",
+              "absolute inset-0 w-full h-full p-3 sm:p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-xs sm:text-sm leading-relaxed bg-transparent",
               isDarkMode
                 ? "text-gray-100 placeholder:text-gray-500"
                 : cn(themeColors.text, "placeholder:text-gray-400")
@@ -1231,7 +1363,7 @@ Tab - Indent in code blocks`;
           {!content.trim() && (
             <div
               className={cn(
-                "absolute inset-4 pointer-events-none text-sm leading-relaxed whitespace-pre-line font-mono",
+                "absolute inset-3 sm:inset-4 pointer-events-none text-xs sm:text-sm leading-relaxed whitespace-pre-line font-mono",
                 isDarkMode ? "text-gray-500" : "text-gray-400"
               )}
             >
@@ -1241,26 +1373,26 @@ Tab - Indent in code blocks`;
         </div>
         <CardFooter
           className={cn(
-            "py-2 px-4 border-t",
+            "py-1.5 sm:py-2 px-3 sm:px-4 border-t",
             isDarkMode
-              ? "border-gray-700 bg-slate-900/50"
+              ? cn(themeColors.cardBorder, "bg-opacity-50")
               : cn(themeColors.cardBorder, "bg-white/50")
           )}
         >
           <div className="flex items-center justify-between w-full">
             <div
               className={cn(
-                "flex items-center gap-2 text-xs",
+                "flex items-center gap-1.5 sm:gap-2 text-xs",
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               )}
             >
               <div
                 className={cn(
-                  "h-2 w-2 rounded-full",
+                  "h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full",
                   isConnected ? "bg-green-500" : "bg-red-500"
                 )}
               />
-              <span>{isConnected ? "Connected" : "Disconnected"}</span>
+              <span className="hidden xs:inline">{isConnected ? "Connected" : "Disconnected"}</span>
             </div>
             <div
               className={cn(
@@ -1268,8 +1400,8 @@ Tab - Indent in code blocks`;
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               )}
             >
-              {content.length} chars | Line{" "}
-              {content.substring(0, cursorPosition).split("\n").length}
+              <span className="hidden sm:inline">{content.length} chars | </span>
+              <span>Line {content.substring(0, cursorPosition).split("\n").length}</span>
             </div>
           </div>
         </CardFooter>
@@ -1279,7 +1411,7 @@ Tab - Indent in code blocks`;
         className={cn(
           "h-full overflow-y-auto border backdrop-blur-sm shadow-lg",
           isDarkMode
-            ? "bg-gradient-to-br from-slate-900/95 to-blue-900/70 border-blue-600/30"
+            ? cn(themeColors.cardBg, themeColors.cardBorder)
             : cn(themeColors.cardBg, themeColors.cardBorder)
         )}
       >
