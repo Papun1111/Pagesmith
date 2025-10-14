@@ -23,7 +23,7 @@ const httpServer = http.createServer(app);
 
 // FIX: Use a more robust, function-based CORS configuration.
 // This explicitly checks an allowlist and is more secure.
-const allowedOrigins = ['http://localhost:3000'];
+const allowedOrigins = [process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'];
 app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or curl requests)
