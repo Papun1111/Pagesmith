@@ -1,85 +1,96 @@
-import Stripe from 'stripe';
-import { findUserByClerkId } from './userService.js'; // Import the new, robust find function
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
+import { findUserByClerkId } from './userService.js';
 import { ApiError } from '../utils/apiError.js';
 import { logger } from '../utils/logger.js';
 import User from '../models/User.js';
 
-// Initialize Stripe with the secret key.
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+// Initialize Razorpay client
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID!,
+  key_secret: process.env.RAZORPAY_KEY_SECRET!,
+});
+
+// Map your internal plan names to prices in the smallest currency unit (e.g., paise for INR)
+const PLAN_PRICES = {
+    demon: 1000*100, // e.g., ₹1000.00
+    hashira: 2500*100, // e.g., ₹2500.00
+};
 
 /**
- * Creates a Stripe Checkout session for a user to subscribe to a plan.
- * It uses the findUserByClerkId service to handle just-in-time user creation.
+ * Creates a Razorpay Order for a subscription plan.
  */
-export const createCheckoutSession = async (clerkId: string, priceId: string, appUrl: string) => {
-  if (!clerkId) {
-    throw new ApiError(401, 'User is not authenticated.');
+export const createRazorpayOrder = async (clerkId: string, plan: 'demon' | 'hashira') => {
+  const user = await findUserByClerkId(clerkId);
+  const amount = PLAN_PRICES[plan];
+
+  if (!amount) {
+    throw new ApiError(400, "Invalid plan specified.");
   }
 
-  // FIX: Use the robust findUserByClerkId function which handles the
-  // race condition by creating the user if they don't exist.
-  const user = await findUserByClerkId(clerkId);
-  const { stripeCustomerId } = user;
+  // FIX: Generate a shorter, random receipt ID to comply with Razorpay's 40-character limit.
+  // This creates a highly unique ID that is well within the length constraint.
+  const receiptId = `rcpt_${crypto.randomBytes(14).toString('hex')}`;
 
-  const sessionParams: Stripe.Checkout.SessionCreateParams = {
-    payment_method_types: ['card'],
-    mode: 'subscription',
-    line_items: [{ price: priceId, quantity: 1 }],
-    metadata: { clerkId },
-    success_url: `${appUrl}/dashboard?checkout=success`,
-    cancel_url: `${appUrl}/pricing?checkout=canceled`,
+  const options = {
+    amount: amount, // Amount in paise
+    currency: "INR", // Or your desired currency
+    receipt: receiptId,
+    notes: {
+      clerkId,
+      plan,
+    },
   };
 
-  // If the user is already a Stripe customer, pass the customer ID.
-  if (stripeCustomerId) {
-    sessionParams.customer = stripeCustomerId;
-  }
-
   try {
-    const session = await stripe.checkout.sessions.create(sessionParams);
-    return { url: session.url };
+    const order = await razorpay.orders.create(options);
+    logger.info(`Razorpay order created for user ${clerkId} for plan ${plan}. Order ID: ${order.id}`);
+    return order;
   } catch (error: any) {
-    logger.error("Stripe session creation failed:", error);
-    throw new ApiError(500, `Stripe Error: ${error.message}`);
+    logger.error("Razorpay order creation failed:", error);
+    throw new ApiError(500, `Razorpay Error: ${error.message}`);
   }
 };
 
 /**
- * Handles subscription changes from Stripe webhooks.
+ * Verifies the payment signature from Razorpay to confirm a successful transaction.
  */
-export const handleSubscriptionChange = async (session: Stripe.Checkout.Session) => {
-  const clerkId = session.metadata?.clerkId;
-  if (!clerkId) {
-    throw new ApiError(400, 'Clerk ID not found in Stripe session metadata.');
-  }
+export const verifyRazorpayPayment = async (
+    razorpay_order_id: string,
+    razorpay_payment_id: string,
+    razorpay_signature: string
+) => {
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
 
-  const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-  
-  if (!subscription.items.data || subscription.items.data.length === 0) {
-      throw new ApiError(400, 'Subscription has no items.');
-  }
-  
-  const priceId = subscription.items.data[0]?.price.id;
+    const expectedSignature = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
+        .update(body.toString())
+        .digest('hex');
 
-  let plan: 'free' | 'demon' | 'hashira' = 'free';
-  if (priceId === process.env.STRIPE_DEMON_PRICE_ID) {
-    plan = 'demon';
-  } else if (priceId === process.env.STRIPE_HASHIRA_PRICE_ID) {
-    plan = 'hashira';
-  }
+    if (expectedSignature !== razorpay_signature) {
+        throw new ApiError(400, 'Invalid payment signature.');
+    }
 
-  await User.findOneAndUpdate(
-    { clerkId },
-    {
-      plan,
-      stripeCustomerId: subscription.customer as string,
-      stripeSubscriptionId: subscription.id,
-      stripePriceId: priceId,
-      stripeSubscriptionStatus: subscription.status,
-    },
-    { upsert: true } // Use upsert in case the webhook arrives before user creation.
-  );
+    // Signature is valid. Fetch order details to get user and plan info.
+    const order = await razorpay.orders.fetch(razorpay_order_id);
+    const { clerkId, plan } = order.notes as { clerkId: string, plan: 'demon' | 'hashira' };
 
-  logger.info(`Subscription updated for user ${clerkId} to plan: ${plan}`);
+    if (!clerkId || !plan) {
+        throw new ApiError(400, 'Order is missing necessary user or plan information.');
+    }
+
+    // Update user's plan in the database
+    await User.findOneAndUpdate(
+        { clerkId },
+        {
+            plan,
+            razorpayOrderId: razorpay_order_id,
+            razorpayPaymentId: razorpay_payment_id,
+        },
+        { new: true }
+    );
+    
+    logger.info(`Payment verified and plan updated for user ${clerkId} to ${plan}.`);
+    return { success: true, plan };
 };
 

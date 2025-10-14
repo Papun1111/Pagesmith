@@ -2,18 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
-import { ManageSubscriptionButton } from '@/components/features/billing/ManageSubscriptionButton';
 import { apiClient } from '@/lib/api';
 import type { UserProfile } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
-/**
- * The billing settings page.
- * It fetches and displays the user's current subscription plan and provides
- * a button to manage their subscription via the Stripe customer portal.
- */
 export default function BillingPage() {
   const { getToken } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -29,7 +25,8 @@ export default function BillingPage() {
         if (!token) throw new Error("User not authenticated.");
         const profile = await apiClient.getUserProfile(token);
         setUserProfile(profile);
-      } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (err: any) {
         console.error("Failed to fetch user profile:", err);
         setError("Could not load your subscription details. Please try again later.");
       } finally {
@@ -69,12 +66,18 @@ export default function BillingPage() {
               ? "You are currently on the Free plan."
               : `You are subscribed to the ${userProfile.plan.charAt(0).toUpperCase() + userProfile.plan.slice(1)} plan.`}
           </CardDescription>
-          <div className="mt-6">
-            <ManageSubscriptionButton
-              isFreePlan={isFreePlan}
-              stripeCustomerId={userProfile.stripeCustomerId}
-            />
-          </div>
+          
+          {/* If on a free plan, show an "Upgrade" button that links to the pricing page. */}
+          {isFreePlan && (
+            <div className="mt-6">
+                <Button asChild>
+                    <Link href="/pricing">Upgrade Plan</Link>
+                </Button>
+            </div>
+          )}
+
+          {/* For paid plans, you could add a "Cancel Subscription" button here in the future,
+              which would call a new backend endpoint. */}
         </div>
       );
     }
@@ -96,3 +99,4 @@ export default function BillingPage() {
     </Card>
   );
 }
+
