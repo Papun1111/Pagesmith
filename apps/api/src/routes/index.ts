@@ -8,10 +8,10 @@ const router: Router = Router();
 
 // Mount the individual route modules under specific paths.
 router.use('/canvases', canvasRoutes);
-
+router.use('/billing', razorpayRoutes); 
 router.use('/ai', geminiRoutes);
 router.use('/user', userRoutes); // Mount the new user routes for profile fetching
-router.use('/billing', razorpayRoutes); 
+
 // Note: The webhook route is handled separately in index.ts for raw body parsing.
 
 export default router;
