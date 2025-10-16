@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Use an environment variable for your backend URL.
-const BACKEND_API_URL = process.env.BACKEND_API_URL_GEMINI || 'https://http-pagesmith.valhalla-brush.com';
+const BACKEND_API_URL = process.env.BACKEND_API_URL_GEMINI || 'http://localhost:8080';
 
 /**
  * Handles POST requests to the /api/gemini endpoint.

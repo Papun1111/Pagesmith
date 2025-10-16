@@ -1,7 +1,7 @@
 import type { Canvas, UserProfile, AccessType } from "@/types";
 
 // Use an environment variable for your backend API URL for flexibility.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://http-pagesmith.valhalla-brush.com/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
 /**
  * A reusable fetch wrapper for making authenticated API calls to your backend.

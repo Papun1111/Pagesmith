@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs"; 
-import { useRouter } from "next/navigation"; 
+import { useAuth } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { apiClient } from "@/lib/api"; 
-import type { Canvas } from "@/types"; 
+import { apiClient } from "@/lib/api";
+import type { Canvas } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -62,8 +62,8 @@ const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
 );
 
 const DashboardSkeleton = () => (
-  // Responsive main content padding
-  <div className="md:ml-16 pt-28 p-4 md:p-8 space-y-12">
+  // Adjusted top padding after header removal
+  <div className="md:ml-16 pt-16 p-4 md:p-8 space-y-12">
     <div className="flex items-center justify-between">
       <Skeleton className="h-10 w-48 sm:w-64 bg-gray-300" />
       <Skeleton className="h-12 w-12 sm:w-48 bg-gray-300" />
@@ -159,14 +159,7 @@ export default function DashboardPage() {
         style={{ fontFamily: "'Poppins', sans-serif" }}
         className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen"
       >
-
-        <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 md:px-8 bg-[#F0F0F0]/80 backdrop-blur-sm border-b border-black">
-          <Link href="/" className="text-xl sm:text-2xl text-black font-black cursor-pointer">
-            PageSmith
-          </Link>
-          <Skeleton className="h-12 w-12 sm:w-48 bg-gray-300" />
-        </header>
-     
+        {/* Header has been removed from the loading state */}
         <div className="fixed top-0 left-0 z-40 h-full w-16 hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0]">
           <span className="font-black text-xl [writing-mode:vertical-rl] tracking-widest uppercase">
             Dashboard
@@ -182,34 +175,17 @@ export default function DashboardPage() {
       style={{ fontFamily: "'Poppins', sans-serif" }}
       className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen"
     >
-      {/* Responsive header padding */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 md:px-8 bg-[#F0F0F0]/80 backdrop-blur-sm border-b border-black">
-        <Link href="/" className="text-xl sm:text-2xl font-black cursor-pointer">
-          PageSmith
-        </Link>
-        <Button
-          onClick={handleCreateNewCanvas}
-          disabled={isCreating}
-          // Responsive button padding and size
-          className="bg-black text-white rounded-none hover:bg-black/80 px-3 sm:px-6 py-3 sm:py-6 font-bold flex items-center"
-        >
-          <PlusCircle className="h-5 w-5 sm:mr-2" />
-          {/* Hide text on small screens */}
-          <span className="hidden sm:inline">
-            {isCreating ? "Creating..." : "Create Canvas"}
-          </span>
-        </Button>
-      </header>
+      {/* Header has been removed */}
 
-      {/* Added explicit width to vertical sidebar */}
+      {/* Vertical sidebar remains */}
       <div className="fixed top-0 left-0 z-40 h-full w-16 hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0]">
         <span className="font-black text-xl [writing-mode:vertical-rl] tracking-widest uppercase">
           Dashboard
         </span>
       </div>
 
-      {/* Responsive main content padding */}
-      <div className="md:ml-16 pt-28 p-4 md:p-8 space-y-12">
+      {/* Adjusted top padding after header removal */}
+      <div className="md:ml-16 pt-16 p-4 md:p-8 space-y-12">
         {error && (
           <div className="flex items-center gap-4 border border-red-500 bg-red-100 p-4 text-red-700 font-bold">
             <AlertTriangle className="h-6 w-6" />
@@ -218,16 +194,29 @@ export default function DashboardPage() {
         )}
 
         <section>
-          {/* Responsive heading size */}
-          <h2 className="text-3xl md:text-4xl font-black mb-4 flex items-center gap-3">
-            My Canvases
-          </h2>
+          {/* Container for title and the relocated "Create" button */}
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-3xl md:text-4xl font-black flex items-center gap-3">
+              My Canvases
+            </h2>
+            <Button
+              onClick={handleCreateNewCanvas}
+              disabled={isCreating}
+              className="bg-black text-white rounded-none hover:bg-black/80 px-3 sm:px-6 py-3 sm:py-6 font-bold flex items-center"
+            >
+              <PlusCircle className="h-5 w-5 sm:mr-2" />
+              <span className="hidden sm:inline">
+                {isCreating ? "Creating..." : "Create Canvas"}
+              </span>
+            </Button>
+          </div>
           {ownedCanvases.length > 0 ? (
             <CanvasGrid canvases={ownedCanvases} />
           ) : (
             <div className="text-center py-16 border-2 border-dashed border-black">
-              {/* Responsive heading size */}
-              <h3 className="text-xl md:text-2xl font-black">NO CANVASES... YET.</h3>
+              <h3 className="text-xl md:text-2xl font-black">
+                NO CANVASES... YET.
+              </h3>
               <p className="text-black/70 mt-2">
                 Click &quot;Create Canvas&quot; to start a new project.
               </p>
@@ -236,7 +225,6 @@ export default function DashboardPage() {
         </section>
 
         <section>
-          {/* Responsive heading size */}
           <h2 className="text-3xl md:text-4xl font-black mb-4 flex items-center gap-3">
             Shared With Me
           </h2>
@@ -244,8 +232,9 @@ export default function DashboardPage() {
             <CanvasGrid canvases={sharedCanvases} />
           ) : (
             <div className="text-center py-16 border-2 border-dashed border-black">
-              {/* Responsive heading size */}
-              <h3 className="text-xl md:text-2xl font-black">NOTHING TO SEE HERE.</h3>
+              <h3 className="text-xl md:text-2xl font-black">
+                NOTHING TO SEE HERE.
+              </h3>
               <p className="text-black/70 mt-2">
                 When someone shares a canvas, it will appear here.
               </p>
