@@ -178,11 +178,7 @@ export default function DashboardPage() {
       {/* Header has been removed */}
 
       {/* Vertical sidebar remains */}
-      <div className="fixed top-0 left-0 z-40 h-full w-16 hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0]">
-        <span className="font-black text-xl [writing-mode:vertical-rl] tracking-widest uppercase">
-          Dashboard
-        </span>
-      </div>
+    
 
       {/* Adjusted top padding after header removal */}
       <div className="md:ml-16 pt-16 p-4 md:p-8 space-y-12">
