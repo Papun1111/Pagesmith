@@ -63,13 +63,13 @@ export function AIAssistantPanel() {
   };
 
   return (
-    <div style={{ fontFamily: "'Poppins', sans-serif" }} className="h-full flex flex-col bg-[#F0F0F0] text-[#111111] p-3 sm:p-4">
+    <div style={{ fontFamily: "'Poppins', sans-serif" }} className="h-full flex flex-col bg-[#F0F0F0] text-[#111111] dark:bg-[#1a1a1a] dark:text-white p-3 sm:p-4">
         <div className="flex-shrink-0">
-            <h2 className="text-xl md:text-2xl font-black flex items-center gap-2">
+            <h2 className="text-xl md:text-2xl font-black dark:text-white text-black flex items-center gap-2">
                 <Sparkles className="h-6 w-6" />
                 AI Assistant
             </h2>
-            <p className="text-sm text-black/70 mt-1">
+            <p className="text-sm text-black/70 dark:text-white mt-1">
                 Ask me to brainstorm, write code, or generate ideas.
             </p>
         </div>
@@ -82,27 +82,27 @@ export function AIAssistantPanel() {
                     placeholder="e.g., Explain React hooks in simple terms..."
                     rows={4}
                     disabled={isLoading}
-                    className="bg-white border-2 border-black rounded-none focus:ring-0 focus:border-black"
+                    className="bg-white border-2 border-black dark:border-white dark:bg-[#1a1a1a] dark:text-white text-black rounded-none focus:ring-0 focus:border-black"
                 />
-                <Button type="submit" disabled={isLoading} className="bg-black text-white rounded-none hover:bg-black/80 font-bold py-3 sm:py-4">
+                <Button type="submit" disabled={isLoading} className="bg-black text-white rounded-none hover:bg-black/80 dark:bg-[#1a1a1a] dark:text-white font-bold py-3 sm:py-4">
                     {isLoading ? 'Generating...' : 'Generate Response'}
                 </Button>
             </form>
 
-            <div className="flex-grow overflow-y-auto rounded-none border-2 border-black p-3 sm:p-4 bg-white">
+            <div className="flex-grow overflow-y-auto rounded-none border-2 border-black dark:border-white p-3 sm:p-4 bg-white dark:bg-[#1a1a1a]">
                 {isLoading && <Skeleton className="w-full h-24 bg-gray-300" />}
                 {error && (
-                    <div className="text-red-700 flex items-start gap-2 border border-red-500 bg-red-100 p-2">
+                    <div className="text-red-700 flex items-start gap-2 border border-red-500 bg-red-100 dark:bg-[#1a1a1a] dark:text-white p-2">
                         <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-1" />
                         <div>
                             <p className="font-bold text-sm">An error occurred:</p>
-                            <p className="text-xs">{error}</p>
+                            <p className="text-xs dark:text-white text-black">{error}</p>
                         </div>
                     </div>
                 )}
                 {response && <p className="text-sm whitespace-pre-wrap">{response}</p>}
                 {!isLoading && !error && !response && (
-                    <p className="text-sm text-black/60">Your AI-generated content will appear here.</p>
+                    <p className="text-sm text-black/60 dark:text-white">Your AI-generated content will appear here.</p>
                 )}
             </div>
         </div>

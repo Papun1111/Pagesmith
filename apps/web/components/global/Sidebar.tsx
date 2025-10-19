@@ -12,7 +12,6 @@ import { type Canvas } from '@/types';
 import { cn } from '@/lib/utils';
 import { FaPhoenixFramework } from "react-icons/fa";
 
-// This component remains unchanged
 const CanvasLinkList = ({ canvases }: { canvases: Canvas[] }) => {
     const pathname = usePathname();
     return (
@@ -21,11 +20,13 @@ const CanvasLinkList = ({ canvases }: { canvases: Canvas[] }) => {
                 <Link
                     href={`/canvas/${canvas._id}`}
                     key={canvas._id}
+                    // --- STYLE CHANGE ---
+                    // Added dark mode classes for active and inactive/hover states.
                     className={cn(
                         "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
                         pathname === `/canvas/${canvas._id}`
-                            ? "bg-black text-white"
-                            : "text-black/70 hover:bg-black/10"
+                            ? "bg-black text-white dark:bg-white dark:text-black"
+                            : "text-black/70 hover:bg-black/10 dark:text-white/70 dark:hover:bg-white/10"
                     )}
                 >
                     <FileText className="h-4 w-4 flex-shrink-0" />
@@ -42,7 +43,6 @@ export function Sidebar() {
     const [canvases, setCanvases] = useState<Canvas[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
-    // This state now controls if the sidebar is in the DOM
     const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
     useEffect(() => {
@@ -83,35 +83,39 @@ export function Sidebar() {
     const sidebarContent = (
         <>
             <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-2">
+                {/* --- STYLE CHANGE --- */}
+                <div className="flex items-center gap-2 text-black dark:text-white">
                     <FaPhoenixFramework className="h-6 w-6" />
                     <h2 className="text-lg font-black">PageSmith</h2>
                 </div>
-        
             </div>
             <nav className="flex-1 space-y-4 overflow-y-auto">
-                <Button onClick={handleCreateNewCanvas} disabled={isCreating} className="w-full justify-start bg-transparent text-black border-2 border-black rounded-none hover:bg-black hover:text-white font-bold">
+                {/* --- STYLE CHANGE --- */}
+                <Button onClick={handleCreateNewCanvas} disabled={isCreating} className="w-full justify-start bg-transparent text-black border-2 border-black rounded-none hover:bg-black hover:text-white font-bold dark:text-white dark:border-white dark:hover:bg-white dark:hover:text-black">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     {isCreating ? 'Creating...' : 'New Canvas'}
                 </Button>
 
                 {isLoading ? (
                     <div className="space-y-2 pt-4">
-                        <Skeleton className="h-8 w-full bg-gray-300" />
-                        <Skeleton className="h-8 w-full bg-gray-300" />
-                        <Skeleton className="h-8 w-full bg-gray-300" />
+                        {/* --- STYLE CHANGE --- */}
+                        <Skeleton className="h-8 w-full bg-gray-300 dark:bg-neutral-800" />
+                        <Skeleton className="h-8 w-full bg-gray-300 dark:bg-neutral-800" />
+                        <Skeleton className="h-8 w-full bg-gray-300 dark:bg-neutral-800" />
                     </div>
                 ) : (
                     <div className="space-y-6 pt-4">
                         {ownedCanvases.length > 0 && (
                             <div>
-                                <h3 className="mb-2 px-2 text-sm font-bold uppercase text-black/50">My Canvases</h3>
+                                {/* --- STYLE CHANGE --- */}
+                                <h3 className="mb-2 px-2 text-sm font-bold uppercase text-black/50 dark:text-gray-400">My Canvases</h3>
                                 <CanvasLinkList canvases={ownedCanvases} />
                             </div>
                         )}
                         {sharedCanvases.length > 0 && (
                             <div>
-                                <h3 className="mb-2 px-2 text-sm font-bold uppercase text-black/50">Shared With Me</h3>
+                                {/* --- STYLE CHANGE --- */}
+                                <h3 className="mb-2 px-2 text-sm font-bold uppercase text-black/50 dark:text-gray-400">Shared With Me</h3>
                                 <CanvasLinkList canvases={sharedCanvases} />
                             </div>
                         )}
@@ -123,36 +127,29 @@ export function Sidebar() {
 
     return (
         <>
-            {/* This toggle button is always rendered in the DOM */}
             <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsSidebarVisible(!isSidebarVisible)}
                 className={cn(
-                    "flex fixed top-1/2 -translate-y-1/2 z-[60] transition-all duration-300 ease-in-out", // <-- POSITIONING CHANGED HERE
-                    // The button's horizontal position still changes based on the state
+                    // --- STYLE CHANGE ---
+                    "flex fixed top-1/2 -translate-y-1/2 z-[60] transition-all duration-300 ease-in-out text-black dark:text-white dark:hover:bg-neutral-800",
                     isSidebarVisible ? "left-60" : "left-2"
                 )}
             >
-                {/* The icon now reflects the action of adding/removing the sidebar */}
                 {isSidebarVisible ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
             </Button>
 
-            {/* **KEY CHANGE**: The sidebar and overlay are now conditionally rendered */}
             {isSidebarVisible && (
                 <>
-                    {/* Overlay for mobile, rendered only when sidebar is visible */}
                     <div
                         className="fixed inset-0 z-40 bg-black/20 md:hidden"
                         onClick={() => setIsSidebarVisible(false)}
                     />
-
-                    {/* Main Sidebar Container, rendered only when visible */}
                     <aside
                         className={cn(
-                            // Base styles
-                            "h-screen w-64 flex-col border-r border-black bg-[#F0F0F0] p-4 flex",
-                            // Positioning
+                            // --- STYLE CHANGE ---
+                            "h-screen w-64 flex-col border-r bg-[#F0F0F0] p-4 flex dark:bg-[#1a1a1a] border-black dark:border-neutral-800",
                             "fixed top-0 left-0 z-50 md:sticky"
                         )}
                     >

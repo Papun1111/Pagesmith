@@ -28,7 +28,7 @@ export default function RootLayout({
 <link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet"></link>
 <Script src="https://checkout.razorpay.com/v1/checkout.js" />
         </head>
-        <body className={cn("font-sans antialiased", font.className)}>
+        <body >
           {children}
         </body>
       </html>

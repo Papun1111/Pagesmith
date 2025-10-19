@@ -72,8 +72,8 @@ export default function PricingPage() {
 
   if (isLoading) {
     return (
-      <div style={{ fontFamily: "'Poppins', sans-serif" }} className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen p-4 md:p-8">
-        <div className="text-center mb-12 md:mb-16">
+      <div style={{ fontFamily: "'Poppins', sans-serif" }} className="w-full dark:bg-[#1a1a1a] dark:text-white bg-[#F0F0F0] text-[#111111] min-h-screen p-4 md:p-8">
+        <div className="text-center dark:text-white mb-12 md:mb-16">
           <Skeleton className="h-10 md:h-12 w-3/4 md:w-1/2 mx-auto mb-4 bg-gray-300" />
           <Skeleton className="h-6 w-1/2 md:w-1/3 mx-auto bg-gray-300" />
         </div>
@@ -87,17 +87,17 @@ export default function PricingPage() {
   }
 
   return (
-    <div style={{ fontFamily: "'Poppins', sans-serif" }} className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen p-4 md:p-8">
-      <div className="text-center mb-12 md:mb-16">
+    <div style={{ fontFamily: "'Poppins', sans-serif" }} className="w-full dark:bg-[#1a1a1a] dark:text-white bg-[#F0F0F0] text-[#111111] min-h-screen p-4 md:p-8">
+      <div className="text-center dark:text-white mb-12 md:mb-16">
         <h1 className="text-xl sm:text-xl md:text-xl font-black tracking-tight">
           CHOOSE YOUR PLAN
         </h1>
-        <p className="mt-4 text-base text-center md:text-lg text-black/70 max-w-2xl mx-auto">
+        <p className="mt-4 text-base text-center dark:text-white md:text-lg text-black/70 max-w-2xl mx-auto">
           Simple, transparent pricing. No hidden fees. Upgrade, downgrade, or cancel anytime.
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto flex flex-row justify-between items-stretch">
+      <div className="max-w-4xl dark:text-white mx-auto flex flex-row justify-between items-stretch">
         {pricingTiers.map((tier) => (
           <PricingCard
             key={tier.id}

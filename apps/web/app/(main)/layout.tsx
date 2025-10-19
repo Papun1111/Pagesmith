@@ -22,7 +22,7 @@ export default function MainLayout({
         {/* Header */}
         <Header />
 
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-800">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-[#1a1a1a]">
           {children}
         </main>
       </div>

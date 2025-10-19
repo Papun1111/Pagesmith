@@ -82,7 +82,7 @@ export default function CanvasPage() {
   if (isLoading) {
     return (
       // Added responsive padding
-      <div style={{ fontFamily: "'Poppins', sans-serif" }} className="p-4 md:p-8 h-full bg-[#F0F0F0]">
+      <div style={{ fontFamily: "'Poppins', sans-serif" }} className="p-4 md:p-8 h-full bg-[#F0F0F0] dark:bg-[#1a1a1a]">
         <Skeleton className="h-12 w-2/3 md:w-1/3 mb-4 bg-gray-300" />
         <Skeleton className="h-[calc(100%-4rem)] w-full bg-gray-300" />
       </div>
@@ -110,9 +110,9 @@ export default function CanvasPage() {
   }
 
   return (
-    <div style={{ fontFamily: "'Poppins', sans-serif" }} className="flex flex-col h-screen bg-[#F0F0F0] text-[#111111]">
+    <div style={{ fontFamily: "'Poppins', sans-serif" }} className="flex flex-col h-screen bg-[#F0F0F0] text-[#111111] dark:bg-[#1a1a1a] dark:text-white">
       {/* Header with responsive stacking */}
-      <header className="flex-shrink-0 p-3 md:p-4 border-b border-black flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+      <header className="flex-shrink-0 p-3 md:p-4 border-b border-black dark:border-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
         <Toolbar canvas={canvas} onCanvasUpdate={onCanvasUpdate} />
         <CollaborationAvatars collaborators={canvas.collaborators} />
       </header>
@@ -120,7 +120,7 @@ export default function CanvasPage() {
       {/* Resizable panel group with dynamic direction */}
       <ResizablePanelGroup 
         direction={isMobile ? "vertical" : "horizontal"} 
-        className="flex-grow"
+        className="flex-grow dark:bg-[#1a1a1a]"
       >
         <ResizablePanel defaultSize={isMobile ? 65 : 75}>
           <main className="h-full overflow-y-auto p-2">
@@ -132,7 +132,7 @@ export default function CanvasPage() {
         <ResizableHandle
           withHandle
           className={cn(
-            "bg-transparent hover:bg-black/10 transition-colors",
+            "bg-transparent hover:bg-black/10 dark:hover:bg-white/10 transition-colors",
             isMobile
               ? "border-y-2 h-4" // Horizontal handle for vertical layout
               : "border-x-2 w-4"  // Vertical handle for horizontal layout

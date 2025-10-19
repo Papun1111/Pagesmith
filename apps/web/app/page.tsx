@@ -94,14 +94,29 @@ export default function LandingPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
+    // Check localStorage first
     const savedMode = localStorage.getItem("darkMode");
+    
     if (savedMode !== null) {
-      setIsDarkMode(savedMode === "true");
+      const isDark = savedMode === "true";
+      setIsDarkMode(isDark);
+      // Immediately apply the class to prevent flash
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
     } else {
+      // Fall back to system preference
       const prefersDark = window.matchMedia(
         "(prefers-color-scheme: dark)"
       ).matches;
       setIsDarkMode(prefersDark);
+      if (prefersDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
     }
   }, []);
 

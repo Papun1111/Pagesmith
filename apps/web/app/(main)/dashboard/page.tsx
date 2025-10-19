@@ -14,7 +14,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
 } from "lucide-react";
-import { motion } from "motion/react"; // Corrected import for staggerChildren
+import { motion } from "motion/react";
 
 const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
   <motion.div
@@ -35,15 +35,15 @@ const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
         className="no-underline text-inherit"
         passHref
       >
+        {/* --- STYLE CHANGE --- */}
         <motion.div
-          className="border border-black p-4 h-48 flex flex-col justify-between group cursor-pointer hover:bg-black hover:text-white transition-colors"
+          className="border border-black p-4 h-48 flex flex-col justify-between group cursor-pointer hover:bg-black hover:text-white transition-colors dark:border-neutral-700 dark:hover:bg-white dark:hover:text-black"
           variants={{
             hidden: { opacity: 0, y: 20 },
             visible: { opacity: 1, y: 0 },
           }}
         >
           <div>
-            {/* Responsive text size for card title */}
             <h3 className="font-black text-lg sm:text-xl truncate flex items-start gap-2">
               <FileText className="h-5 w-5 mt-1 flex-shrink-0" />
               <span className="truncate">{canvas.title}</span>
@@ -62,31 +62,31 @@ const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
 );
 
 const DashboardSkeleton = () => (
-  // Adjusted top padding after header removal
   <div className="md:ml-16 pt-16 p-4 md:p-8 space-y-12">
     <div className="flex items-center justify-between">
-      <Skeleton className="h-10 w-48 sm:w-64 bg-gray-300" />
-      <Skeleton className="h-12 w-12 sm:w-48 bg-gray-300" />
+      {/* --- STYLE CHANGE --- */}
+      <Skeleton className="h-10 w-48 sm:w-64 bg-gray-300 dark:bg-neutral-800" />
+      <Skeleton className="h-12 w-12 sm:w-48 bg-gray-300 dark:bg-neutral-800" />
     </div>
     <div className="space-y-12">
       <div>
-        <Skeleton className="h-8 w-48 mb-4 bg-gray-300" />
+        <Skeleton className="h-8 w-48 mb-4 bg-gray-300 dark:bg-neutral-800" />
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Skeleton
               key={i}
-              className="h-48 w-full rounded-none bg-gray-300"
+              className="h-48 w-full rounded-none bg-gray-300 dark:bg-neutral-800"
             />
           ))}
         </div>
       </div>
       <div>
-        <Skeleton className="h-8 w-64 mb-4 bg-gray-300" />
+        <Skeleton className="h-8 w-64 mb-4 bg-gray-300 dark:bg-neutral-800" />
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(2)].map((_, i) => (
             <Skeleton
               key={i}
-              className="h-48 w-full rounded-none bg-gray-300"
+              className="h-48 w-full rounded-none bg-gray-300 dark:bg-neutral-800"
             />
           ))}
         </div>
@@ -155,12 +155,13 @@ export default function DashboardPage() {
 
   if (!isLoaded || isLoading) {
     return (
+      // --- STYLE CHANGE ---
       <main
         style={{ fontFamily: "'Poppins', sans-serif" }}
-        className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen"
+        className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen dark:bg-[#1a1a1a] dark:text-white"
       >
-        {/* Header has been removed from the loading state */}
-        <div className="fixed top-0 left-0 z-40 h-full w-16 hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0]">
+        {/* --- STYLE CHANGE --- */}
+        <div className="fixed top-0 left-0 z-40 h-full w-16 hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0] dark:bg-[#1a1a1a] dark:border-neutral-800">
           <span className="font-black text-xl [writing-mode:vertical-rl] tracking-widest uppercase">
             Dashboard
           </span>
@@ -171,34 +172,30 @@ export default function DashboardPage() {
   }
 
   return (
+    // --- STYLE CHANGE ---
     <main
       style={{ fontFamily: "'Poppins', sans-serif" }}
-      className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen"
+      className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen dark:bg-[#1a1a1a] dark:text-white"
     >
-      {/* Header has been removed */}
-
-      {/* Vertical sidebar remains */}
-    
-
-      {/* Adjusted top padding after header removal */}
       <div className="md:ml-16 pt-16 p-4 md:p-8 space-y-12">
         {error && (
-          <div className="flex items-center gap-4 border border-red-500 bg-red-100 p-4 text-red-700 font-bold">
+          // --- STYLE CHANGE ---
+          <div className="flex items-center gap-4 border border-red-500 bg-red-100 p-4 text-red-700 font-bold dark:bg-red-900/20 dark:border-red-500/50 dark:text-red-300">
             <AlertTriangle className="h-6 w-6" />
             <p>{error}</p>
           </div>
         )}
 
         <section>
-          {/* Container for title and the relocated "Create" button */}
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-3xl md:text-4xl font-black flex items-center gap-3">
               My Canvases
             </h2>
+            {/* --- STYLE CHANGE --- */}
             <Button
               onClick={handleCreateNewCanvas}
               disabled={isCreating}
-              className="bg-black text-white rounded-none hover:bg-black/80 px-3 sm:px-6 py-3 sm:py-6 font-bold flex items-center"
+              className="bg-black text-white rounded-none hover:bg-black/80 px-3 sm:px-6 py-3 sm:py-6 font-bold flex items-center dark:bg-white dark:text-black dark:hover:bg-white/90"
             >
               <PlusCircle className="h-5 w-5 sm:mr-2" />
               <span className="hidden sm:inline">
@@ -209,11 +206,13 @@ export default function DashboardPage() {
           {ownedCanvases.length > 0 ? (
             <CanvasGrid canvases={ownedCanvases} />
           ) : (
-            <div className="text-center py-16 border-2 border-dashed border-black">
+            // --- STYLE CHANGE ---
+            <div className="text-center py-16 border-2 border-dashed border-black dark:border-neutral-700">
               <h3 className="text-xl md:text-2xl font-black">
                 NO CANVASES... YET.
               </h3>
-              <p className="text-black/70 mt-2">
+              {/* --- STYLE CHANGE --- */}
+              <p className="text-black/70 mt-2 dark:text-white/70">
                 Click &quot;Create Canvas&quot; to start a new project.
               </p>
             </div>
@@ -227,11 +226,13 @@ export default function DashboardPage() {
           {sharedCanvases.length > 0 ? (
             <CanvasGrid canvases={sharedCanvases} />
           ) : (
-            <div className="text-center py-16 border-2 border-dashed border-black">
+            // --- STYLE CHANGE ---
+            <div className="text-center py-16 border-2 border-dashed border-black dark:border-neutral-700">
               <h3 className="text-xl md:text-2xl font-black">
                 NOTHING TO SEE HERE.
               </h3>
-              <p className="text-black/70 mt-2">
+               {/* --- STYLE CHANGE --- */}
+              <p className="text-black/70 mt-2 dark:text-white/70">
                 When someone shares a canvas, it will appear here.
               </p>
             </div>
@@ -241,3 +242,4 @@ export default function DashboardPage() {
     </main>
   );
 }
+
