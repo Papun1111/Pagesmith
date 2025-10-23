@@ -59,7 +59,6 @@ interface ThemeColors {
   cardBorder: string;
 }
 
-// Light mode themes
 const lightThemes: Record<ColorTheme, ThemeColors> = {
   light: {
     bg: "bg-indigo-100",
@@ -143,7 +142,6 @@ const lightThemes: Record<ColorTheme, ThemeColors> = {
   },
 };
 
-// Dark mode themes
 const darkThemes: Record<ColorTheme, ThemeColors> = {
   light: {
     bg: "bg-indigo-950",
@@ -376,7 +374,7 @@ function extractTextContent(node: ReactNode): string {
 export function Editor({ canvasId, initialContent }: EditorProps) {
   const [content, setContent] = useState(initialContent);
   const [cursorPosition, setCursorPosition] = useState(0);
-  const [previewOnly, setPreviewOnly] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [colorTheme, setColorTheme] = useState<ColorTheme>("light");
@@ -757,15 +755,11 @@ Tab - Indent`;
     try {
       let importedContent = "";
 
-      // Handle PDF files
       if (fileExtension === 'pdf') {
-        // For PDFs, we need a library like pdf.js
-        // Since we can't install it here, we'll show a message
         alert("PDF import requires pdf.js library. Please install it in your project:\nnpm install pdfjs-dist");
         return;
       }
 
-      // Handle code and text files
       const validExtensions = ['txt', 'md', 'markdown', 'js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'rs', 'go', 'yml', 'yaml', 'json', 'xml', 'html', 'css', 'scss'];
       
       if (validExtensions.includes(fileExtension || '')) {
@@ -781,7 +775,6 @@ Tab - Indent`;
               return;
             }
 
-            // Get language identifier for code blocks
             const languageMap: Record<string, string> = {
               'js': 'javascript',
               'jsx': 'javascript',
@@ -805,14 +798,12 @@ Tab - Indent`;
 
             const language = languageMap[fileExtension || ''] || fileExtension;
             
-            // Format as code block if it's a code file
             if (language && !['txt', 'md', 'markdown'].includes(fileExtension || '')) {
               importedContent = `\n\n\`\`\`${language}\n${text}\n\`\`\`\n\n`;
             } else {
               importedContent = `\n\n${text}\n\n`;
             }
 
-            // Insert at cursor position instead of overriding
             const { selectionStart } = textarea;
             const beforeCursor = content.substring(0, selectionStart);
             const afterCursor = content.substring(selectionStart);
@@ -821,7 +812,6 @@ Tab - Indent`;
             setContent(newContent);
             isLocalChange.current = true;
 
-            // Set cursor position after imported content
             setTimeout(() => {
               const newPosition = selectionStart + importedContent.length;
               textarea.selectionStart = textarea.selectionEnd = newPosition;
@@ -843,7 +833,6 @@ Tab - Indent`;
       alert("Failed to import file. Please try again.");
     }
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -1200,74 +1189,10 @@ Tab - Indent`;
     </div>
   );
 
-  if (previewOnly) {
-    return (
-      <div
-        className={cn(
-          "h-full w-full relative",
-          isDarkMode ? themeColors.bg : themeColors.bg
-        )}
-      >
-        <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
-          <div className="relative">
-            <Button
-              onClick={() => setShowThemeMenu(!showThemeMenu)}
-              className="text-white bg-slate-700 hover:bg-slate-600"
-              size="sm"
-            >
-              <Palette className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Theme</span>
-            </Button>
-            {showThemeMenu && <ThemeSelector />}
-          </div>
-          <Button
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className="text-white bg-slate-700 hover:bg-slate-600"
-            size="sm"
-          >
-            {isDarkMode ? (
-              <Sun className="h-4 w-4 sm:mr-2" />
-            ) : (
-              <Moon className="h-4 w-4 sm:mr-2" />
-            )}
-            <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
-          </Button>
-          <Button
-            onClick={exportToPDF}
-            disabled={isExporting || !content.trim()}
-            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-            size="sm"
-          >
-            <Download className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">{isExporting ? "Exporting..." : "Export PDF"}</span>
-          </Button>
-          <Button
-            onClick={() => setPreviewOnly(false)}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            size="sm"
-          >
-            <Edit3 className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Edit</span>
-          </Button>
-        </div>
-        <Card
-          className={cn(
-            "h-full overflow-y-auto border-0",
-            isDarkMode
-              ? themeColors.cardBg
-              : cn(themeColors.cardBg, themeColors.cardBorder)
-          )}
-        >
-          <PreviewContent />
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div
       className={cn(
-        "grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4 h-full w-full p-2 sm:p-4 relative",
+        "h-full w-full relative",
         isDarkMode ? themeColors.bg : themeColors.bg
       )}
     >
@@ -1279,143 +1204,146 @@ Tab - Indent`;
         className="hidden"
       />
 
-      <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-10 flex flex-wrap justify-end gap-1 sm:gap-2">
+      <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
         <div className="relative">
           <Button
             onClick={() => setShowThemeMenu(!showThemeMenu)}
-            className="text-white bg-slate-700 hover:bg-slate-600 h-8 sm:h-9 px-2 sm:px-3"
+            className="text-white bg-slate-700 hover:bg-slate-600"
             size="sm"
           >
-            <Palette className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+            <Palette className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Theme</span>
           </Button>
           {showThemeMenu && <ThemeSelector />}
         </div>
         <Button
           onClick={() => setIsDarkMode(!isDarkMode)}
-          className="text-white bg-slate-700 hover:bg-slate-600 h-8 sm:h-9 px-2 sm:px-3"
+          className="text-white bg-slate-700 hover:bg-slate-600"
           size="sm"
         >
           {isDarkMode ? (
-            <Sun className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+            <Sun className="h-4 w-4 sm:mr-2" />
           ) : (
-            <Moon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+            <Moon className="h-4 w-4 sm:mr-2" />
           )}
           <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
         </Button>
         <Button
           onClick={triggerFileImport}
-          className="bg-purple-600 hover:bg-purple-700 text-white h-8 sm:h-9 px-2 sm:px-3"
+          className="bg-purple-600 hover:bg-purple-700 text-white"
           size="sm"
         >
-          <Upload className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+          <Upload className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">Import</span>
         </Button>
         <Button
           onClick={exportToPDF}
           disabled={isExporting || !content.trim()}
-          className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 h-8 sm:h-9 px-2 sm:px-3"
+          className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
           size="sm"
         >
-          <Download className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+          <Download className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">{isExporting ? "Exporting..." : "PDF"}</span>
         </Button>
         <Button
-          onClick={() => setPreviewOnly(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white h-8 sm:h-9 px-2 sm:px-3"
+          onClick={() => setIsEditMode(!isEditMode)}
+          className={cn(
+            "text-white",
+            isEditMode
+              ? "bg-green-600 hover:bg-green-700"
+              : "bg-blue-600 hover:bg-blue-700"
+          )}
           size="sm"
         >
-          <Eye className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Preview</span>
+          {isEditMode ? (
+            <Eye className="h-4 w-4 sm:mr-2" />
+          ) : (
+            <Edit3 className="h-4 w-4 sm:mr-2" />
+          )}
+          <span className="hidden sm:inline">{isEditMode ? "Preview" : "Edit"}</span>
         </Button>
       </div>
 
       <Card
         className={cn(
-          "flex flex-col h-full border shadow-lg mt-12 sm:mt-14 lg:mt-0",
+          "h-full overflow-y-auto border-0",
           isDarkMode
-            ? cn(themeColors.cardBg, themeColors.cardBorder)
+            ? themeColors.cardBg
             : cn(themeColors.cardBg, themeColors.cardBorder)
         )}
       >
-        <div className="relative flex-grow">
-          <Textarea
-            ref={textareaRef}
-            value={content}
-            onChange={() => {}}
-            onInput={handleInput}
-            onKeyDown={handleKeyDown}
-            onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
-            className={cn(
-              "absolute inset-0 w-full h-full p-3 sm:p-4 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-xs sm:text-sm leading-relaxed bg-transparent",
-              isDarkMode
-                ? "text-gray-100 placeholder:text-gray-500"
-                : cn(themeColors.text, "placeholder:text-gray-400")
-            )}
-            placeholder=""
-            style={{
-              minHeight: "100%",
-              lineHeight: "1.6",
-              fontFamily:
-                'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Inconsolata, "Roboto Mono", monospace',
-            }}
-          />
-          {!content.trim() && (
-            <div
-              className={cn(
-                "absolute inset-3 sm:inset-4 pointer-events-none text-xs sm:text-sm leading-relaxed whitespace-pre-line font-mono",
-                isDarkMode ? "text-gray-500" : "text-gray-400"
-              )}
-            >
-              {getPlaceholderText()}
-            </div>
-          )}
-        </div>
-        <CardFooter
-          className={cn(
-            "py-1.5 sm:py-2 px-3 sm:px-4 border-t",
-            isDarkMode
-              ? cn(themeColors.cardBorder, "bg-opacity-50")
-              : cn(themeColors.cardBorder, "bg-white/50")
-          )}
-        >
-          <div className="flex items-center justify-between w-full">
-            <div
-              className={cn(
-                "flex items-center gap-1.5 sm:gap-2 text-xs",
-                isDarkMode ? "text-gray-400" : "text-gray-600"
-              )}
-            >
-              <div
+        {isEditMode ? (
+          <div className="relative h-full flex flex-col">
+            <div className="relative flex-grow">
+              <Textarea
+                ref={textareaRef}
+                value={content}
+                onChange={() => {}}
+                onInput={handleInput}
+                onKeyDown={handleKeyDown}
+                onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
                 className={cn(
-                  "h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full",
-                  isConnected ? "bg-green-500" : "bg-red-500"
+                  "absolute inset-0 w-full h-full p-4 sm:p-6 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm leading-relaxed bg-transparent",
+                  isDarkMode
+                    ? "text-gray-100 placeholder:text-gray-500"
+                    : cn(themeColors.text, "placeholder:text-gray-400")
                 )}
+                placeholder=""
+                style={{
+                  minHeight: "100%",
+                  lineHeight: "1.6",
+                  fontFamily:
+                    'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Inconsolata, "Roboto Mono", monospace',
+                }}
               />
-              <span className="hidden xs:inline">{isConnected ? "Connected" : "Disconnected"}</span>
+              {!content.trim() && (
+                <div
+                  className={cn(
+                    "absolute inset-4 sm:inset-6 pointer-events-none text-sm leading-relaxed whitespace-pre-line font-mono",
+                    isDarkMode ? "text-gray-500" : "text-gray-400"
+                  )}
+                >
+                  {getPlaceholderText()}
+                </div>
+              )}
             </div>
-            <div
+            <CardFooter
               className={cn(
-                "text-xs",
-                isDarkMode ? "text-gray-400" : "text-gray-600"
+                "py-2 px-4 sm:px-6 border-t",
+                isDarkMode
+                  ? cn(themeColors.cardBorder, "bg-opacity-50")
+                  : cn(themeColors.cardBorder, "bg-white/50")
               )}
             >
-              <span className="hidden sm:inline">{content.length} chars | </span>
-              <span>Line {content.substring(0, cursorPosition).split("\n").length}</span>
-            </div>
+              <div className="flex items-center justify-between w-full">
+                <div
+                  className={cn(
+                    "flex items-center gap-2 text-xs",
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "h-2 w-2 rounded-full",
+                      isConnected ? "bg-green-500" : "bg-red-500"
+                    )}
+                  />
+                  <span>{isConnected ? "Connected" : "Disconnected"}</span>
+                </div>
+                <div
+                  className={cn(
+                    "text-xs",
+                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                  )}
+                >
+                  {content.length} chars | Line {content.substring(0, cursorPosition).split("\n").length}
+                </div>
+              </div>
+            </CardFooter>
           </div>
-        </CardFooter>
-      </Card>
-
-      <Card
-        className={cn(
-          "h-full overflow-y-auto border backdrop-blur-sm shadow-lg",
-          isDarkMode
-            ? cn(themeColors.cardBg, themeColors.cardBorder)
-            : cn(themeColors.cardBg, themeColors.cardBorder)
+        ) : (
+          <PreviewContent />
         )}
-      >
-        <PreviewContent />
       </Card>
     </div>
   );
