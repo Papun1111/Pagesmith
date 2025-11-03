@@ -10,7 +10,7 @@ const font = Inter({ subsets: ["latin"] });
 // Define the metadata for the application (title, description, etc.)
 export const metadata: Metadata = {
   title: "PageSmith - Real-Time Collaborative Canvas",
-  description: "A feature-rich, collaborative canvas application inspired by Notion.",
+  description: "A feature-rich, collaborative canvas application",
 };
 
 
