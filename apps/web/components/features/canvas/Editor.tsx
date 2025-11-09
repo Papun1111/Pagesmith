@@ -1,10 +1,8 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 "use client";
 
 import { useState, useEffect, useRef, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
@@ -14,6 +12,8 @@ import {
   Edit3,
   Download,
   Upload,
+  Moon,
+  Sun,
   Palette,
 } from "lucide-react";
 
@@ -231,7 +231,7 @@ function CopyButton({
   theme,
 }: {
   content: string;
-  // language?: string;
+  language?: string;
   isDarkMode: boolean;
   theme: ColorTheme;
 }) {
@@ -329,7 +329,7 @@ function CodeBlock({
 
       <CopyButton
         content={content}
-        // language={language}
+        language={language}
         isDarkMode={isDarkMode}
         theme={theme}
       />
@@ -376,37 +376,12 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
   const [cursorPosition, setCursorPosition] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [colorTheme] = useState<ColorTheme>("light");
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [colorTheme, setColorTheme] = useState<ColorTheme>("light");
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  // derive dark mode from system preference (no toggle UI)
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() =>
-    typeof window !== "undefined" && window.matchMedia
-      ? window.matchMedia("(prefers-color-scheme: dark)").matches
-      : true
-  );
-
-  useEffect(() => {
-    if (!window.matchMedia) return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = (e: MediaQueryListEvent) => setIsDarkMode(e.matches);
-    try {
-      mq.addEventListener("change", handler);
-      return () => mq.removeEventListener("change", handler);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (e) {
-      // Safari fallback
-      // @ts-expect
-      mq.addListener(handler);
-      return () =>
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        mq.removeListener(handler);
-    }
-  }, []);
 
   const { socket, isConnected } = useSocket(canvasId);
 
@@ -501,40 +476,101 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
   const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget;
-    let newValue = textarea.value;
+    const newValue = textarea.value;
     const { selectionStart } = textarea;
 
-    // Auto-convert ++underline++ to <u>...</u> so preview shows underline (rehype-raw used)
-    // and convert simple custom shortcuts (like ++, == for underline) — small, non-destructive transform
-    newValue = newValue.replace(/\+\+([^\n\+]+?)\+\+/g, "<u>$1</u>");
+    if (newValue[selectionStart - 1] === " ") {
+      const beforeCursor = newValue.substring(0, selectionStart - 1);
+      const afterCursor = newValue.substring(selectionStart);
+      const words = beforeCursor.split(/\s/);
+      const lastWord = words[words.length - 1];
 
-    // Auto-detect heading when user types many # at line start (keep markdown but ensure proper spacing)
-    // This is a gentle helper that won't remove user's text but will normalize '#Heading' -> '# Heading'
-    newValue = newValue.replace(/(^|\n)(#{1,6})([^\s#\n])/g, "$1$2 $3");
+      if (lastWord.startsWith("/")) {
+        const command = lastWord.substring(1).toLowerCase();
+        let replacement = "";
+        let cursorOffset = 0;
 
-    // Auto-detect URLs without protocol and make them clickable with https:// prefix (preserve original text)
-    // We only transform in preview, not in underlying saved content — implement by inserting explicit https if user typed bare domain followed by space
-    // Example: "example.com" -> "https://example.com" so ReactMarkdown treats as link
-    newValue = newValue.replace(/(^|\s)((?:[a-z0-9-]+\.)+[a-z]{2,})(\s|$)/gi, (m, p1, p2, p3) => {
-      // if already part of markdown link or has protocol, skip
-      if (/https?:\/\//i.test(m) || /\[.*\]\(.*\)/.test(m)) return m;
-      return `${p1}https://${p2}${p3}`;
-    });
+        switch (command) {
+          case "code":
+            replacement = "```\n// Add your code here\n```";
+            cursorOffset = 4;
+            break;
+          case "js":
+          case "javascript":
+            replacement =
+              "```javascript\n// Add your JavaScript code here\nconsole.log('Hello, World!');\n```";
+            cursorOffset = 13;
+            break;
+          case "ts":
+          case "typescript":
+            replacement =
+              "```typescript\n// Add your TypeScript code here\ninterface Example {\n  message: string;\n}\n\nconst example: Example = {\n  message: 'Hello, World!'\n};\n```";
+            cursorOffset = 14;
+            break;
+          case "py":
+          case "python":
+            replacement =
+              "```python\n# Add your Python code here\ndef hello_world():\n    print('Hello, World!')\n\nhello_world()\n```";
+            cursorOffset = 10;
+            break;
+          case "md":
+          case "markdown":
+            replacement =
+              "```markdown\n# Add your Markdown content here\n\n**Bold text** and *italic text*\n\n- List item 1\n- List item 2\n```";
+            cursorOffset = 12;
+            break;
+          case "json":
+            replacement =
+              '```json\n{\n  "key": "value",\n  "number": 123,\n  "boolean": true\n}\n```';
+            cursorOffset = 8;
+            break;
+          case "h1":
+            replacement = "# ";
+            cursorOffset = 2;
+            break;
+          case "h2":
+            replacement = "## ";
+            cursorOffset = 3;
+            break;
+          case "h3":
+            replacement = "### ";
+            cursorOffset = 4;
+            break;
+          case "quote":
+            replacement = "> ";
+            cursorOffset = 2;
+            break;
+          case "todo":
+            replacement = "- [ ] ";
+            cursorOffset = 6;
+            break;
+          case "table":
+            replacement =
+              "| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |";
+            cursorOffset = 12;
+            break;
+        }
 
-    // keep caret position reasonable — we update content normally and then reposition caret later
+        if (replacement) {
+          e.preventDefault();
+          const newContent =
+            beforeCursor.replace(lastWord, replacement) + afterCursor;
+          setContent(newContent);
+          isLocalChange.current = true;
+
+          setTimeout(() => {
+            const newPosition =
+              selectionStart - lastWord.length - 1 + cursorOffset;
+            textarea.selectionStart = textarea.selectionEnd = newPosition;
+            textarea.focus();
+          }, 0);
+          return;
+        }
+      }
+    }
+
     setContent(newValue);
     isLocalChange.current = true;
-
-    setTimeout(() => {
-      // try to keep the caret at the same relative position after small transforms
-      try {
-        const diff = newValue.length - textarea.value.length;
-        textarea.selectionStart = textarea.selectionEnd = selectionStart + Math.max(0, diff);
-      } catch (err) {
-        // ignore
-      }
-      textarea.focus();
-    }, 0);
   };
 
   const insertText = (text: string) => {
@@ -585,7 +621,25 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
   const getPlaceholderText = () => {
     if (!content.trim()) {
-      return `Type '/' for commands, or start writing...\n\nQuick Commands:\n/js [space] - JavaScript code block\n/ts [space] - TypeScript code block  \n/py [space] - Python code block\n/md [space] - Markdown code block\n/json [space] - JSON code block\n/code [space] - Generic code block\n/h1, /h2, /h3 [space] - Headers\n/quote [space] - Quote block\n/todo [space] - Checklist item\n/table [space] - Table template\n\nShortcuts:\nCmd/Ctrl + B - Bold\nCmd/Ctrl + I - Italic\nCmd/Ctrl + K - Link\nTab - Indent`;
+      return `Type '/' for commands, or start writing...
+
+Quick Commands:
+/js [space] - JavaScript code block
+/ts [space] - TypeScript code block  
+/py [space] - Python code block
+/md [space] - Markdown code block
+/json [space] - JSON code block
+/code [space] - Generic code block
+/h1, /h2, /h3 [space] - Headers
+/quote [space] - Quote block
+/todo [space] - Checklist item
+/table [space] - Table template
+
+Shortcuts:
+Cmd/Ctrl + B - Bold
+Cmd/Ctrl + I - Italic
+Cmd/Ctrl + K - Link
+Tab - Indent`;
     }
     return "Continue writing...";
   };
@@ -630,11 +684,11 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
       const previewContent = clonedContent.innerHTML;
       const printWindow = window.open("", "_blank");
-
+      
       if (!printWindow) {
         throw new Error("Please allow pop-ups to export PDF");
       }
-
+      
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -744,14 +798,11 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
             const language = languageMap[fileExtension || ''] || fileExtension;
             
-           if (language && !['txt', 'md', 'markdown'].includes(fileExtension || '')) {
-
-  importedContent =
-    '\n\n```' + language + '\n' + text + '\n```\n\n';
-} else {
-  importedContent = '\n\n' + text + '\n\n';
-}
-
+            if (language && !['txt', 'md', 'markdown'].includes(fileExtension || '')) {
+              importedContent = `\n\n\`\`\`${language}\n${text}\n\`\`\`\n\n`;
+            } else {
+              importedContent = `\n\n${text}\n\n`;
+            }
 
             const { selectionStart } = textarea;
             const beforeCursor = content.substring(0, selectionStart);
@@ -793,285 +844,350 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
   const themeColors = isDarkMode ? darkThemes[colorTheme] : lightThemes[colorTheme];
 
-  const toggleFullScreen = async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const el = cardRef.current as any;
-    if (!el) return;
-    try {
-      if (!document.fullscreenElement) {
-        await el.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch (err) {
-      console.warn("Fullscreen API error", err);
-    }
-  };
-
-  const PreviewContent = () => {
-    // Preprocess content for preview: we allow a few safe auto transforms (underline via <u>)
-    // Use rehypeRaw to render <u> from the transformed content.
-    const previewSource = content;
-
-    return (
-      <article
-        ref={previewRef}
-        className={cn(
-          "prose max-w-none p-4 sm:p-6",
-          isDarkMode
-            ? "prose-invert prose-headings:text-white prose-p:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-blockquote:text-gray-300"
-            : ""
-        )}
-      >
-        {previewSource.trim() ? (
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw]}
-            components={{
-              code: (props) => (
-                <CodeBlock
-                  {...props}
-                  isDarkMode={isDarkMode}
-                  theme={colorTheme}
-                />
-              ),
-              blockquote(props) {
-                const blockquoteContent = extractTextContent(props.children);
-                return (
-                  <div className="relative group">
-                    <CopyButton
-                      content={blockquoteContent}
-                      isDarkMode={isDarkMode}
-                      theme={colorTheme}
-                    />
-                    <blockquote
-                      className={cn(
-                        "border-l-4 pl-4 py-2 italic my-4 rounded-r-md",
-                        isDarkMode
-                          ? "border-blue-500 bg-blue-900/30 text-gray-100"
-                          : cn(
-                              themeColors.blockquoteBorder,
-                              themeColors.blockquoteBg,
-                              themeColors.blockquoteText
-                            )
-                      )}
-                    >
-                      {props.children}
-                    </blockquote>
-                  </div>
-                );
-              },
-              p(props) {
-                const paragraphContent = extractTextContent(props.children);
-                return (
-                  <div className="relative group">
-                    <CopyButton
-                      content={paragraphContent}
-                      isDarkMode={isDarkMode}
-                      theme={colorTheme}
-                    />
-                    <p className={isDarkMode ? "text-gray-300" : themeColors.text}>
-                      {props.children}
-                    </p>
-                  </div>
-                );
-              },
-              strong(props) {
-                return (
-                  <strong
+  const PreviewContent = () => (
+    <article
+      ref={previewRef}
+      className={cn(
+        "prose max-w-none p-4 sm:p-6",
+        isDarkMode
+          ? "prose-invert prose-headings:text-white prose-p:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-blockquote:text-gray-300"
+          : ""
+      )}
+    >
+      {content.trim() ? (
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            code: (props) => (
+              <CodeBlock
+                {...props}
+                isDarkMode={isDarkMode}
+                theme={colorTheme}
+              />
+            ),
+            blockquote(props) {
+              const blockquoteContent = extractTextContent(props.children);
+              return (
+                <div className="relative group">
+                  <CopyButton
+                    content={blockquoteContent}
+                    isDarkMode={isDarkMode}
+                    theme={colorTheme}
+                  />
+                  <blockquote
                     className={cn(
-                      "font-bold",
-                      isDarkMode ? "text-white" : themeColors.text
-                    )}
-                  >
-                    {props.children}
-                  </strong>
-                );
-              },
-              em(props) {
-                return (
-                  <em
-                    className={cn(
-                      "italic",
+                      "border-l-4 pl-4 py-2 italic my-4 rounded-r-md",
                       isDarkMode
-                        ? "text-blue-200"
-                        : cn(themeColors.linkColor, themeColors.linkHover)
-                    )}
-                  >
-                    {props.children}
-                  </em>
-                );
-              },
-              a(props) {
-                const href = props.href || "";
-                const secureHref = href.startsWith("http://")
-                  ? href.replace("http://", "https://")
-                  : href.startsWith("https://") ||
-                    href.startsWith("/") ||
-                    href.startsWith("#")
-                  ? href
-                  : `https://${href}`;
-
-                return (
-                  <a
-                    href={secureHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(
-                      "underline",
-                      isDarkMode
-                        ? "text-blue-400 hover:text-blue-300"
-                        : cn(themeColors.linkColor, themeColors.linkHover)
-                    )}
-                  >
-                    {props.children}
-                  </a>
-                );
-              },
-              table(props) {
-                return (
-                  <div className="overflow-x-auto my-4">
-                    <table
-                      className={cn(
-                        "w-full border-collapse border rounded-lg",
-                        isDarkMode ? "border-blue-600" : themeColors.tableBorder
-                      )}
-                    >
-                      {props.children}
-                    </table>
-                  </div>
-                );
-              },
-              th(props) {
-                return (
-                  <th
-                    className={cn(
-                      "border px-4 py-2 font-semibold text-left",
-                      isDarkMode
-                        ? "border-blue-600 bg-blue-900/60 text-white"
+                        ? "border-blue-500 bg-blue-900/30 text-gray-100"
                         : cn(
-                            themeColors.tableBorder,
-                            themeColors.tableHeaderBg,
-                            themeColors.tableHeaderText
+                            themeColors.blockquoteBorder,
+                            themeColors.blockquoteBg,
+                            themeColors.blockquoteText
                           )
                     )}
                   >
                     {props.children}
-                  </th>
-                );
-              },
-              td(props) {
-                return (
-                  <td
+                  </blockquote>
+                </div>
+              );
+            },
+            p(props) {
+              const paragraphContent = extractTextContent(props.children);
+              return (
+                <div className="relative group">
+                  <CopyButton
+                    content={paragraphContent}
+                    isDarkMode={isDarkMode}
+                    theme={colorTheme}
+                  />
+                  <p className={isDarkMode ? "text-gray-300" : themeColors.text}>
+                    {props.children}
+                  </p>
+                </div>
+              );
+            },
+            strong(props) {
+              return (
+                <strong
+                  className={cn(
+                    "font-bold",
+                    isDarkMode ? "text-white" : themeColors.text
+                  )}
+                >
+                  {props.children}
+                </strong>
+              );
+            },
+            em(props) {
+              return (
+                <em
+                  className={cn(
+                    "italic",
+                    isDarkMode
+                      ? "text-blue-200"
+                      : cn(themeColors.linkColor, themeColors.linkHover)
+                  )}
+                >
+                  {props.children}
+                </em>
+              );
+            },
+            a(props) {
+              const href = props.href || "";
+              const secureHref = href.startsWith("http://")
+                ? href.replace("http://", "https://")
+                : href.startsWith("https://") ||
+                  href.startsWith("/") ||
+                  href.startsWith("#")
+                ? href
+                : `https://${href}`;
+
+              return (
+                <a
+                  href={secureHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "underline",
+                    isDarkMode
+                      ? "text-blue-400 hover:text-blue-300"
+                      : cn(themeColors.linkColor, themeColors.linkHover)
+                  )}
+                >
+                  {props.children}
+                </a>
+              );
+            },
+            table(props) {
+              return (
+                <div className="overflow-x-auto my-4">
+                  <table
                     className={cn(
-                      "border px-4 py-2",
-                      isDarkMode
-                        ? "border-blue-600 text-gray-100"
-                        : cn(
-                            themeColors.tableBorder,
-                            themeColors.tableText
-                          )
+                      "w-full border-collapse border rounded-lg",
+                      isDarkMode ? "border-blue-600" : themeColors.tableBorder
                     )}
                   >
                     {props.children}
-                  </td>
-                );
-              },
-              ul(props) {
-                return (
-                  <ul
-                    className={cn(
-                      "list-disc list-inside space-y-1",
-                      isDarkMode ? "text-gray-100" : themeColors.text
-                    )}
-                  >
-                    {props.children}
-                  </ul>
-                );
-              },
-              ol(props) {
-                return (
-                  <ol
-                    className={cn(
-                      "list-decimal list-inside space-y-1",
-                      isDarkMode ? "text-gray-100" : themeColors.text
-                    )}
-                  >
-                    {props.children}
-                  </ol>
-                );
-              },
-              li(props) {
-                return (
-                  <li className={isDarkMode ? "text-gray-100" : themeColors.text}>
-                    {props.children}
-                  </li>
-                );
-              },
-              h1(props) {
-                return (
-                  <h1
-                    className={cn(
-                      "font-bold",
-                      isDarkMode ? "text-white" : themeColors.text
-                    )}
-                  >
-                    {props.children}
-                  </h1>
-                );
-              },
-              h2(props) {
-                return (
-                  <h2
-                    className={cn(
-                      "font-bold",
-                      isDarkMode ? "text-white" : themeColors.text
-                    )}
-                  >
-                    {props.children}
-                  </h2>
-                );
-              },
-              h3(props) {
-                return (
-                  <h3
-                    className={cn(
-                      "font-bold",
-                      isDarkMode ? "text-white" : themeColors.text
-                    )}
-                  >
-                    {props.children}
-                  </h3>
-                );
-              },
-            }}
-          >
-            {previewSource}
-          </ReactMarkdown>
-        ) : (
-          <div
+                  </table>
+                </div>
+              );
+            },
+            th(props) {
+              return (
+                <th
+                  className={cn(
+                    "border px-4 py-2 font-semibold text-left",
+                    isDarkMode
+                      ? "border-blue-600 bg-blue-900/60 text-white"
+                      : cn(
+                          themeColors.tableBorder,
+                          themeColors.tableHeaderBg,
+                          themeColors.tableHeaderText
+                        )
+                  )}
+                >
+                  {props.children}
+                </th>
+              );
+            },
+            td(props) {
+              return (
+                <td
+                  className={cn(
+                    "border px-4 py-2",
+                    isDarkMode
+                      ? "border-blue-600 text-gray-100"
+                      : cn(
+                          themeColors.tableBorder,
+                          themeColors.tableText
+                        )
+                  )}
+                >
+                  {props.children}
+                </td>
+              );
+            },
+            ul(props) {
+              return (
+                <ul
+                  className={cn(
+                    "list-disc list-inside space-y-1",
+                    isDarkMode ? "text-gray-100" : themeColors.text
+                  )}
+                >
+                  {props.children}
+                </ul>
+              );
+            },
+            ol(props) {
+              return (
+                <ol
+                  className={cn(
+                    "list-decimal list-inside space-y-1",
+                    isDarkMode ? "text-gray-100" : themeColors.text
+                  )}
+                >
+                  {props.children}
+                </ol>
+              );
+            },
+            li(props) {
+              return (
+                <li className={isDarkMode ? "text-gray-100" : themeColors.text}>
+                  {props.children}
+                </li>
+              );
+            },
+            h1(props) {
+              return (
+                <h1
+                  className={cn(
+                    "font-bold",
+                    isDarkMode ? "text-white" : themeColors.text
+                  )}
+                >
+                  {props.children}
+                </h1>
+              );
+            },
+            h2(props) {
+              return (
+                <h2
+                  className={cn(
+                    "font-bold",
+                    isDarkMode ? "text-white" : themeColors.text
+                  )}
+                >
+                  {props.children}
+                </h2>
+              );
+            },
+            h3(props) {
+              return (
+                <h3
+                  className={cn(
+                    "font-bold",
+                    isDarkMode ? "text-white" : themeColors.text
+                  )}
+                >
+                  {props.children}
+                </h3>
+              );
+            },
+          }}
+        >
+          {content}
+        </ReactMarkdown>
+      ) : (
+        <div
+          className={cn(
+            "italic text-center py-12",
+            isDarkMode ? "text-blue-200/60" : "text-gray-400"
+          )}
+        >
+          <div className="text-4xl mb-4">✨</div>
+          <p className={isDarkMode ? "text-blue-200" : "text-gray-600"}>
+            Start typing to see your content come to life...
+          </p>
+          <p
             className={cn(
-              "italic text-center py-12",
-              isDarkMode ? "text-blue-200/60" : "text-gray-400"
+              "text-sm mt-2",
+              isDarkMode ? "text-blue-300/70" : "text-gray-500"
             )}
           >
-            <div className="text-4xl mb-4">✨</div>
-            <p className={isDarkMode ? "text-blue-200" : "text-gray-600"}>
-              Start typing to see your content come to life...
-            </p>
-            <p
+            Use{" "}
+            <code
               className={cn(
-                "text-sm mt-2",
-                isDarkMode ? "text-blue-300/70" : "text-gray-500"
+                "px-2 py-1 rounded",
+                isDarkMode
+                  ? "bg-blue-800/60 text-white"
+                  : cn(themeColors.codeBg, themeColors.codeText)
               )}
             >
-              Use <code className={cn("px-2 py-1 rounded", isDarkMode ? "bg-blue-800/60 text-white" : cn(themeColors.codeBg, themeColors.codeText))}>/</code> commands for quick formatting
-            </p>
-          </div>
+              /
+            </code>{" "}
+            commands for quick formatting
+          </p>
+        </div>
+      )}
+    </article>
+  );
+
+  const ThemeSelector = () => (
+    <div className="absolute z-20 right-0 mt-2 w-36">
+      <div
+        className={cn(
+          "rounded-lg shadow-lg border",
+          isDarkMode
+            ? "bg-slate-800 border-slate-700"
+            : "bg-white border-gray-200"
         )}
-      </article>
-    );
-  };
+      >
+        <button
+          onClick={() => {
+            setColorTheme("light");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 rounded-t-lg transition-colors",
+            colorTheme === "light" &&
+              (isDarkMode ? "bg-slate-700" : "bg-indigo-100"),
+            isDarkMode ? "text-white hover:bg-slate-700" : "text-gray-900 hover:bg-gray-100"
+          )}
+        >
+          Indigo
+        </button>
+        <button
+          onClick={() => {
+            setColorTheme("nord");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
+            colorTheme === "nord" &&
+              (isDarkMode ? "bg-slate-700" : "bg-slate-100"),
+            isDarkMode
+              ? "text-white border-slate-700 hover:bg-slate-700"
+              : "text-gray-900 border-gray-200 hover:bg-gray-100"
+          )}
+        >
+          Nord
+        </button>
+        <button
+          onClick={() => {
+            setColorTheme("slate");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
+            colorTheme === "slate" &&
+              (isDarkMode ? "bg-slate-700" : "bg-emerald-100"),
+            isDarkMode
+              ? "text-white border-slate-700 hover:bg-slate-700"
+              : "text-gray-900 border-gray-200 hover:bg-gray-100"
+          )}
+        >
+          Emerald
+        </button>
+        <button
+          onClick={() => {
+            setColorTheme("ocean");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t rounded-b-lg transition-colors",
+            colorTheme === "ocean" &&
+              (isDarkMode ? "bg-slate-700" : "bg-cyan-100"),
+            isDarkMode
+              ? "text-white border-slate-700 hover:bg-slate-700"
+              : "text-gray-900 border-gray-200 hover:bg-gray-100"
+          )}
+        >
+          Ocean
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -1089,6 +1205,29 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
       />
 
       <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
+        <div className="relative">
+          <Button
+            onClick={() => setShowThemeMenu(!showThemeMenu)}
+            className="text-white bg-slate-700 hover:bg-slate-600"
+            size="sm"
+          >
+            <Palette className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Theme</span>
+          </Button>
+          {showThemeMenu && <ThemeSelector />}
+        </div>
+        <Button
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          className="text-white bg-slate-700 hover:bg-slate-600"
+          size="sm"
+        >
+          {isDarkMode ? (
+            <Sun className="h-4 w-4 sm:mr-2" />
+          ) : (
+            <Moon className="h-4 w-4 sm:mr-2" />
+          )}
+          <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
+        </Button>
         <Button
           onClick={triggerFileImport}
           className="bg-purple-600 hover:bg-purple-700 text-white"
@@ -1123,18 +1262,9 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
           )}
           <span className="hidden sm:inline">{isEditMode ? "Preview" : "Edit"}</span>
         </Button>
-        <Button
-          onClick={toggleFullScreen}
-          className="bg-slate-700 hover:bg-slate-600 text-white"
-          size="sm"
-        >
-          <Palette className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Toggle Fullscreen</span>
-        </Button>
       </div>
 
       <Card
-        ref={cardRef}
         className={cn(
           "h-full overflow-y-auto border-0",
           isDarkMode
