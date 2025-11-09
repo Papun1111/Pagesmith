@@ -4,17 +4,15 @@ import { useState, useEffect, useRef, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
   Copy,
   Check,
-  Eye,
-  Edit3,
   Download,
   Upload,
-  Moon,
-  Sun,
   Palette,
+  Maximize,
+  Minimize,
 } from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
@@ -36,12 +34,11 @@ interface CodeBlockProps {
   [key: string]: any;
 }
 
-type ColorTheme = "light" | "nord" | "slate" | "ocean";
+type ColorTheme = "nord" | "slate";
 
 interface ThemeColors {
   bg: string;
   text: string;
-  codeBlockBg: string;
   codeBg: string;
   codeBorder: string;
   codeText: string;
@@ -59,114 +56,10 @@ interface ThemeColors {
   cardBorder: string;
 }
 
-const lightThemes: Record<ColorTheme, ThemeColors> = {
-  light: {
-    bg: "bg-indigo-100",
-    text: "text-indigo-950",
-    codeBlockBg: "#f8f5ff",
-    codeBg: "bg-indigo-200",
-    codeBorder: "border-indigo-300",
-    codeText: "text-indigo-900",
-    blockquoteBg: "bg-indigo-200",
-    blockquoteBorder: "border-indigo-500",
-    blockquoteText: "text-indigo-800",
-    linkColor: "text-indigo-600",
-    linkHover: "hover:text-indigo-700",
-    tableBg: "bg-indigo-50",
-    tableBorder: "border-indigo-300",
-    tableHeaderBg: "bg-indigo-200",
-    tableHeaderText: "text-indigo-900",
-    tableText: "text-indigo-900",
-    cardBg: "bg-indigo-50",
-    cardBorder: "border-indigo-200",
-  },
-  nord: {
-    bg: "bg-slate-200",
-    text: "text-slate-900",
-    codeBlockBg: "#eceff4",
-    codeBg: "bg-slate-300",
-    codeBorder: "border-slate-400",
-    codeText: "text-slate-900",
-    blockquoteBg: "bg-slate-300",
-    blockquoteBorder: "border-slate-600",
-    blockquoteText: "text-slate-800",
-    linkColor: "text-cyan-700",
-    linkHover: "hover:text-cyan-800",
-    tableBg: "bg-slate-100",
-    tableBorder: "border-slate-400",
-    tableHeaderBg: "bg-slate-300",
-    tableHeaderText: "text-slate-900",
-    tableText: "text-slate-900",
-    cardBg: "bg-slate-100",
-    cardBorder: "border-slate-300",
-  },
-  slate: {
-    bg: "bg-emerald-100",
-    text: "text-emerald-950",
-    codeBlockBg: "#f0fdf4",
-    codeBg: "bg-emerald-200",
-    codeBorder: "border-emerald-300",
-    codeText: "text-emerald-900",
-    blockquoteBg: "bg-emerald-200",
-    blockquoteBorder: "border-emerald-600",
-    blockquoteText: "text-emerald-800",
-    linkColor: "text-teal-600",
-    linkHover: "hover:text-teal-700",
-    tableBg: "bg-emerald-50",
-    tableBorder: "border-emerald-300",
-    tableHeaderBg: "bg-emerald-200",
-    tableHeaderText: "text-emerald-900",
-    tableText: "text-emerald-900",
-    cardBg: "bg-emerald-50",
-    cardBorder: "border-emerald-200",
-  },
-  ocean: {
-    bg: "bg-cyan-100",
-    text: "text-cyan-950",
-    codeBlockBg: "#ecf8ff",
-    codeBg: "bg-cyan-200",
-    codeBorder: "border-cyan-300",
-    codeText: "text-cyan-900",
-    blockquoteBg: "bg-cyan-200",
-    blockquoteBorder: "border-blue-600",
-    blockquoteText: "text-cyan-800",
-    linkColor: "text-blue-600",
-    linkHover: "hover:text-blue-700",
-    tableBg: "bg-cyan-50",
-    tableBorder: "border-cyan-300",
-    tableHeaderBg: "bg-cyan-200",
-    tableHeaderText: "text-cyan-900",
-    tableText: "text-cyan-900",
-    cardBg: "bg-cyan-50",
-    cardBorder: "border-cyan-200",
-  },
-};
-
 const darkThemes: Record<ColorTheme, ThemeColors> = {
-  light: {
-    bg: "bg-indigo-950",
-    text: "text-indigo-100",
-    codeBlockBg: "#1e1b4b",
-    codeBg: "bg-indigo-900",
-    codeBorder: "border-indigo-700",
-    codeText: "text-indigo-200",
-    blockquoteBg: "bg-indigo-900",
-    blockquoteBorder: "border-indigo-500",
-    blockquoteText: "text-indigo-200",
-    linkColor: "text-indigo-400",
-    linkHover: "hover:text-indigo-300",
-    tableBg: "bg-indigo-900",
-    tableBorder: "border-indigo-700",
-    tableHeaderBg: "bg-indigo-800",
-    tableHeaderText: "text-indigo-100",
-    tableText: "text-indigo-100",
-    cardBg: "bg-indigo-900",
-    cardBorder: "border-indigo-800",
-  },
   nord: {
     bg: "bg-slate-900",
     text: "text-slate-100",
-    codeBlockBg: "#1e293b",
     codeBg: "bg-slate-800",
     codeBorder: "border-slate-600",
     codeText: "text-slate-200",
@@ -186,7 +79,6 @@ const darkThemes: Record<ColorTheme, ThemeColors> = {
   slate: {
     bg: "bg-emerald-950",
     text: "text-emerald-100",
-    codeBlockBg: "#022c22",
     codeBg: "bg-emerald-900",
     codeBorder: "border-emerald-700",
     codeText: "text-emerald-200",
@@ -203,40 +95,16 @@ const darkThemes: Record<ColorTheme, ThemeColors> = {
     cardBg: "bg-emerald-900",
     cardBorder: "border-emerald-800",
   },
-  ocean: {
-    bg: "bg-cyan-950",
-    text: "text-cyan-100",
-    codeBlockBg: "#083344",
-    codeBg: "bg-cyan-900",
-    codeBorder: "border-cyan-700",
-    codeText: "text-cyan-200",
-    blockquoteBg: "bg-cyan-900",
-    blockquoteBorder: "border-blue-500",
-    blockquoteText: "text-cyan-200",
-    linkColor: "text-blue-400",
-    linkHover: "hover:text-blue-300",
-    tableBg: "bg-cyan-900",
-    tableBorder: "border-cyan-700",
-    tableHeaderBg: "bg-cyan-800",
-    tableHeaderText: "text-cyan-100",
-    tableText: "text-cyan-100",
-    cardBg: "bg-cyan-900",
-    cardBorder: "border-cyan-800",
-  },
 };
 
 function CopyButton({
   content,
-  isDarkMode,
   theme,
 }: {
   content: string;
-  language?: string;
-  isDarkMode: boolean;
   theme: ColorTheme;
 }) {
   const [copied, setCopied] = useState(false);
-  const themeColors = isDarkMode ? darkThemes[theme] : lightThemes[theme];
 
   const handleCopy = async () => {
     try {
@@ -252,28 +120,13 @@ function CopyButton({
     <Button
       variant="ghost"
       size="sm"
-      className={cn(
-        "absolute top-2 right-2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity border",
-        isDarkMode
-          ? "bg-slate-800 hover:bg-slate-700 border-slate-700"
-          : "bg-white/50 hover:bg-white/80 border-slate-300"
-      )}
+      className="absolute top-2 right-2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity border bg-slate-800 hover:bg-slate-700 border-slate-700"
       onClick={handleCopy}
     >
       {copied ? (
-        <Check
-          className={cn(
-            "h-3 w-3",
-            isDarkMode ? "text-green-400" : "text-green-600"
-          )}
-        />
+        <Check className="h-3 w-3 text-green-400" />
       ) : (
-        <Copy
-          className={cn(
-            "h-3 w-3",
-            isDarkMode ? "text-white" : themeColors.codeText
-          )}
-        />
+        <Copy className="h-3 w-3 text-white" />
       )}
     </Button>
   );
@@ -282,30 +135,19 @@ function CopyButton({
 function CodeBlock({
   children,
   className,
-  isDarkMode,
   theme,
   ...rest
-}: CodeBlockProps & { isDarkMode: boolean; theme: ColorTheme }) {
+}: CodeBlockProps & { theme: ColorTheme }) {
   const match = /language-(\w+)/.exec(className || "");
   const language = match ? match[1] : "";
   const isInline = !match;
   const content = String(children || "").replace(/\n$/, "");
-  const themeColors = isDarkMode ? darkThemes[theme] : lightThemes[theme];
 
   if (isInline) {
     return (
       <code
         {...rest}
-        className={cn(
-          "px-2 py-1 rounded font-mono text-sm border",
-          isDarkMode
-            ? "bg-slate-800 text-white border-slate-600"
-            : cn(
-                themeColors.codeBg,
-                themeColors.codeText,
-                themeColors.codeBorder
-              )
-        )}
+        className="px-2 py-1 rounded font-mono text-sm border bg-slate-800 text-white border-slate-600"
       >
         {children}
       </code>
@@ -315,33 +157,18 @@ function CodeBlock({
   return (
     <div className="relative group my-4">
       {language && (
-        <div
-          className={cn(
-            "absolute top-2 left-4 text-xs px-2 py-1 rounded-md z-10",
-            isDarkMode
-              ? "text-gray-300 bg-gray-700"
-              : cn(themeColors.codeBg, themeColors.codeText)
-          )}
-        >
+        <div className="absolute top-2 left-4 text-xs px-2 py-1 rounded-md z-10 text-gray-300 bg-gray-700">
           {language}
         </div>
       )}
 
-      <CopyButton
-        content={content}
-        language={language}
-        isDarkMode={isDarkMode}
-        theme={theme}
-      />
+      <CopyButton content={content} theme={theme} />
 
       <SyntaxHighlighter
-        style={isDarkMode ? oneDark : oneLight}
+        style={oneDark}
         language={language || "text"}
         PreTag="div"
-        className={cn(
-          "rounded-lg border",
-          isDarkMode ? "border-slate-700" : themeColors.codeBorder
-        )}
+        className="rounded-lg border border-slate-700"
         customStyle={{
           margin: 0,
           borderRadius: "0.5rem",
@@ -374,14 +201,15 @@ function extractTextContent(node: ReactNode): string {
 export function Editor({ canvasId, initialContent }: EditorProps) {
   const [content, setContent] = useState(initialContent);
   const [cursorPosition, setCursorPosition] = useState(0);
-  const [isEditMode, setIsEditMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [colorTheme, setColorTheme] = useState<ColorTheme>("light");
+  const [colorTheme, setColorTheme] = useState<ColorTheme>("nord");
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   const { socket, isConnected } = useSocket(canvasId);
 
@@ -409,6 +237,31 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
       isLocalChange.current = false;
     }
   }, [debouncedContent, canvasId, isConnected, socket]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (!containerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error("Error toggling fullscreen:", err);
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget;
@@ -482,85 +335,74 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     if (newValue[selectionStart - 1] === " ") {
       const beforeCursor = newValue.substring(0, selectionStart - 1);
       const afterCursor = newValue.substring(selectionStart);
-      const words = beforeCursor.split(/\s/);
-      const lastWord = words[words.length - 1];
-
-      if (lastWord.startsWith("/")) {
-        const command = lastWord.substring(1).toLowerCase();
+      
+      const lineStart = beforeCursor.lastIndexOf("\n") + 1;
+      const currentLine = beforeCursor.substring(lineStart);
+      
+      if (currentLine.trim().startsWith("/")) {
+        const command = currentLine.trim().substring(1).toLowerCase();
         let replacement = "";
-        let cursorOffset = 0;
 
         switch (command) {
-          case "code":
-            replacement = "```\n// Add your code here\n```";
-            cursorOffset = 4;
-            break;
           case "js":
           case "javascript":
-            replacement =
-              "```javascript\n// Add your JavaScript code here\nconsole.log('Hello, World!');\n```";
-            cursorOffset = 13;
+            replacement = "```javascript\n\n```";
             break;
           case "ts":
           case "typescript":
-            replacement =
-              "```typescript\n// Add your TypeScript code here\ninterface Example {\n  message: string;\n}\n\nconst example: Example = {\n  message: 'Hello, World!'\n};\n```";
-            cursorOffset = 14;
+            replacement = "```typescript\n\n```";
             break;
           case "py":
           case "python":
-            replacement =
-              "```python\n# Add your Python code here\ndef hello_world():\n    print('Hello, World!')\n\nhello_world()\n```";
-            cursorOffset = 10;
+            replacement = "```python\n\n```";
             break;
           case "md":
           case "markdown":
-            replacement =
-              "```markdown\n# Add your Markdown content here\n\n**Bold text** and *italic text*\n\n- List item 1\n- List item 2\n```";
-            cursorOffset = 12;
+            replacement = "```markdown\n\n```";
             break;
           case "json":
-            replacement =
-              '```json\n{\n  "key": "value",\n  "number": 123,\n  "boolean": true\n}\n```';
-            cursorOffset = 8;
+            replacement = "```json\n\n```";
+            break;
+          case "code":
+            replacement = "```\n\n```";
             break;
           case "h1":
             replacement = "# ";
-            cursorOffset = 2;
             break;
           case "h2":
             replacement = "## ";
-            cursorOffset = 3;
             break;
           case "h3":
             replacement = "### ";
-            cursorOffset = 4;
             break;
           case "quote":
             replacement = "> ";
-            cursorOffset = 2;
             break;
           case "todo":
             replacement = "- [ ] ";
-            cursorOffset = 6;
             break;
           case "table":
             replacement =
-              "| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |";
-            cursorOffset = 12;
+              "| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |";
             break;
         }
 
         if (replacement) {
           e.preventDefault();
-          const newContent =
-            beforeCursor.replace(lastWord, replacement) + afterCursor;
+          
+          const beforeLine = beforeCursor.substring(0, lineStart);
+          const newContent = beforeLine + replacement + afterCursor;
           setContent(newContent);
           isLocalChange.current = true;
 
           setTimeout(() => {
-            const newPosition =
-              selectionStart - lastWord.length - 1 + cursorOffset;
+            let newPosition;
+            if (replacement.includes("```")) {
+              const codeBlockStart = lineStart + replacement.indexOf("\n") + 1;
+              newPosition = beforeLine.length + codeBlockStart;
+            } else {
+              newPosition = beforeLine.length + replacement.length;
+            }
             textarea.selectionStart = textarea.selectionEnd = newPosition;
             textarea.focus();
           }, 0);
@@ -624,16 +466,16 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
       return `Type '/' for commands, or start writing...
 
 Quick Commands:
-/js [space] - JavaScript code block
-/ts [space] - TypeScript code block  
-/py [space] - Python code block
-/md [space] - Markdown code block
-/json [space] - JSON code block
-/code [space] - Generic code block
-/h1, /h2, /h3 [space] - Headers
-/quote [space] - Quote block
-/todo [space] - Checklist item
-/table [space] - Table template
+/js - JavaScript code block
+/ts - TypeScript code block  
+/py - Python code block
+/md - Markdown code block
+/json - JSON code block
+/code - Generic code block
+/h1, /h2, /h3 - Headers
+/quote - Quote block
+/todo - Checklist item
+/table - Table template
 
 Shortcuts:
 Cmd/Ctrl + B - Bold
@@ -684,11 +526,11 @@ Tab - Indent`;
 
       const previewContent = clonedContent.innerHTML;
       const printWindow = window.open("", "_blank");
-      
+
       if (!printWindow) {
         throw new Error("Please allow pop-ups to export PDF");
       }
-      
+
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -745,26 +587,52 @@ Tab - Indent`;
     }
   };
 
-  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const fileName = file.name;
-    const fileExtension = fileName.split('.').pop()?.toLowerCase();
+    const fileExtension = fileName.split(".").pop()?.toLowerCase();
 
     try {
       let importedContent = "";
 
-      if (fileExtension === 'pdf') {
-        alert("PDF import requires pdf.js library. Please install it in your project:\nnpm install pdfjs-dist");
+      if (fileExtension === "pdf") {
+        alert(
+          "PDF import requires pdf.js library. Please install it in your project:\nnpm install pdfjs-dist"
+        );
         return;
       }
 
-      const validExtensions = ['txt', 'md', 'markdown', 'js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'rs', 'go', 'yml', 'yaml', 'json', 'xml', 'html', 'css', 'scss'];
-      
-      if (validExtensions.includes(fileExtension || '')) {
+      const validExtensions = [
+        "txt",
+        "md",
+        "markdown",
+        "js",
+        "jsx",
+        "ts",
+        "tsx",
+        "py",
+        "java",
+        "cpp",
+        "c",
+        "h",
+        "rs",
+        "go",
+        "yml",
+        "yaml",
+        "json",
+        "xml",
+        "html",
+        "css",
+        "scss",
+      ];
+
+      if (validExtensions.includes(fileExtension || "")) {
         const reader = new FileReader();
-        
+
         reader.onload = (e) => {
           const text = e.target?.result as string;
           if (text) {
@@ -776,29 +644,32 @@ Tab - Indent`;
             }
 
             const languageMap: Record<string, string> = {
-              'js': 'javascript',
-              'jsx': 'javascript',
-              'ts': 'typescript',
-              'tsx': 'typescript',
-              'py': 'python',
-              'java': 'java',
-              'cpp': 'cpp',
-              'c': 'c',
-              'h': 'c',
-              'rs': 'rust',
-              'go': 'go',
-              'yml': 'yaml',
-              'yaml': 'yaml',
-              'json': 'json',
-              'xml': 'xml',
-              'html': 'html',
-              'css': 'css',
-              'scss': 'scss',
+              js: "javascript",
+              jsx: "javascript",
+              ts: "typescript",
+              tsx: "typescript",
+              py: "python",
+              java: "java",
+              cpp: "cpp",
+              c: "c",
+              h: "c",
+              rs: "rust",
+              go: "go",
+              yml: "yaml",
+              yaml: "yaml",
+              json: "json",
+              xml: "xml",
+              html: "html",
+              css: "css",
+              scss: "scss",
             };
 
-            const language = languageMap[fileExtension || ''] || fileExtension;
-            
-            if (language && !['txt', 'md', 'markdown'].includes(fileExtension || '')) {
+            const language = languageMap[fileExtension || ""] || fileExtension;
+
+            if (
+              language &&
+              !["txt", "md", "markdown"].includes(fileExtension || "")
+            ) {
               importedContent = `\n\n\`\`\`${language}\n${text}\n\`\`\`\n\n`;
             } else {
               importedContent = `\n\n${text}\n\n`;
@@ -808,7 +679,7 @@ Tab - Indent`;
             const beforeCursor = content.substring(0, selectionStart);
             const afterCursor = content.substring(selectionStart);
             const newContent = beforeCursor + importedContent + afterCursor;
-            
+
             setContent(newContent);
             isLocalChange.current = true;
 
@@ -826,7 +697,9 @@ Tab - Indent`;
 
         reader.readAsText(file);
       } else {
-        alert(`Unsupported file type: .${fileExtension}\n\nSupported formats:\n- Text: .txt, .md, .markdown\n- Code: .js, .jsx, .ts, .tsx, .py, .java, .cpp, .c, .h, .rs, .go\n- Config: .yml, .yaml, .json, .xml\n- Web: .html, .css, .scss`);
+        alert(
+          `Unsupported file type: .${fileExtension}\n\nSupported formats:\n- Text: .txt, .md, .markdown\n- Code: .js, .jsx, .ts, .tsx, .py, .java, .cpp, .c, .h, .rs, .go\n- Config: .yml, .yaml, .json, .xml\n- Web: .html, .css, .scss`
+        );
       }
     } catch (error) {
       console.error("Failed to import file:", error);
@@ -842,313 +715,20 @@ Tab - Indent`;
     fileInputRef.current?.click();
   };
 
-  const themeColors = isDarkMode ? darkThemes[colorTheme] : lightThemes[colorTheme];
-
-  const PreviewContent = () => (
-    <article
-      ref={previewRef}
-      className={cn(
-        "prose max-w-none p-4 sm:p-6",
-        isDarkMode
-          ? "prose-invert prose-headings:text-white prose-p:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-blockquote:text-gray-300"
-          : ""
-      )}
-    >
-      {content.trim() ? (
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          components={{
-            code: (props) => (
-              <CodeBlock
-                {...props}
-                isDarkMode={isDarkMode}
-                theme={colorTheme}
-              />
-            ),
-            blockquote(props) {
-              const blockquoteContent = extractTextContent(props.children);
-              return (
-                <div className="relative group">
-                  <CopyButton
-                    content={blockquoteContent}
-                    isDarkMode={isDarkMode}
-                    theme={colorTheme}
-                  />
-                  <blockquote
-                    className={cn(
-                      "border-l-4 pl-4 py-2 italic my-4 rounded-r-md",
-                      isDarkMode
-                        ? "border-blue-500 bg-blue-900/30 text-gray-100"
-                        : cn(
-                            themeColors.blockquoteBorder,
-                            themeColors.blockquoteBg,
-                            themeColors.blockquoteText
-                          )
-                    )}
-                  >
-                    {props.children}
-                  </blockquote>
-                </div>
-              );
-            },
-            p(props) {
-              const paragraphContent = extractTextContent(props.children);
-              return (
-                <div className="relative group">
-                  <CopyButton
-                    content={paragraphContent}
-                    isDarkMode={isDarkMode}
-                    theme={colorTheme}
-                  />
-                  <p className={isDarkMode ? "text-gray-300" : themeColors.text}>
-                    {props.children}
-                  </p>
-                </div>
-              );
-            },
-            strong(props) {
-              return (
-                <strong
-                  className={cn(
-                    "font-bold",
-                    isDarkMode ? "text-white" : themeColors.text
-                  )}
-                >
-                  {props.children}
-                </strong>
-              );
-            },
-            em(props) {
-              return (
-                <em
-                  className={cn(
-                    "italic",
-                    isDarkMode
-                      ? "text-blue-200"
-                      : cn(themeColors.linkColor, themeColors.linkHover)
-                  )}
-                >
-                  {props.children}
-                </em>
-              );
-            },
-            a(props) {
-              const href = props.href || "";
-              const secureHref = href.startsWith("http://")
-                ? href.replace("http://", "https://")
-                : href.startsWith("https://") ||
-                  href.startsWith("/") ||
-                  href.startsWith("#")
-                ? href
-                : `https://${href}`;
-
-              return (
-                <a
-                  href={secureHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    "underline",
-                    isDarkMode
-                      ? "text-blue-400 hover:text-blue-300"
-                      : cn(themeColors.linkColor, themeColors.linkHover)
-                  )}
-                >
-                  {props.children}
-                </a>
-              );
-            },
-            table(props) {
-              return (
-                <div className="overflow-x-auto my-4">
-                  <table
-                    className={cn(
-                      "w-full border-collapse border rounded-lg",
-                      isDarkMode ? "border-blue-600" : themeColors.tableBorder
-                    )}
-                  >
-                    {props.children}
-                  </table>
-                </div>
-              );
-            },
-            th(props) {
-              return (
-                <th
-                  className={cn(
-                    "border px-4 py-2 font-semibold text-left",
-                    isDarkMode
-                      ? "border-blue-600 bg-blue-900/60 text-white"
-                      : cn(
-                          themeColors.tableBorder,
-                          themeColors.tableHeaderBg,
-                          themeColors.tableHeaderText
-                        )
-                  )}
-                >
-                  {props.children}
-                </th>
-              );
-            },
-            td(props) {
-              return (
-                <td
-                  className={cn(
-                    "border px-4 py-2",
-                    isDarkMode
-                      ? "border-blue-600 text-gray-100"
-                      : cn(
-                          themeColors.tableBorder,
-                          themeColors.tableText
-                        )
-                  )}
-                >
-                  {props.children}
-                </td>
-              );
-            },
-            ul(props) {
-              return (
-                <ul
-                  className={cn(
-                    "list-disc list-inside space-y-1",
-                    isDarkMode ? "text-gray-100" : themeColors.text
-                  )}
-                >
-                  {props.children}
-                </ul>
-              );
-            },
-            ol(props) {
-              return (
-                <ol
-                  className={cn(
-                    "list-decimal list-inside space-y-1",
-                    isDarkMode ? "text-gray-100" : themeColors.text
-                  )}
-                >
-                  {props.children}
-                </ol>
-              );
-            },
-            li(props) {
-              return (
-                <li className={isDarkMode ? "text-gray-100" : themeColors.text}>
-                  {props.children}
-                </li>
-              );
-            },
-            h1(props) {
-              return (
-                <h1
-                  className={cn(
-                    "font-bold",
-                    isDarkMode ? "text-white" : themeColors.text
-                  )}
-                >
-                  {props.children}
-                </h1>
-              );
-            },
-            h2(props) {
-              return (
-                <h2
-                  className={cn(
-                    "font-bold",
-                    isDarkMode ? "text-white" : themeColors.text
-                  )}
-                >
-                  {props.children}
-                </h2>
-              );
-            },
-            h3(props) {
-              return (
-                <h3
-                  className={cn(
-                    "font-bold",
-                    isDarkMode ? "text-white" : themeColors.text
-                  )}
-                >
-                  {props.children}
-                </h3>
-              );
-            },
-          }}
-        >
-          {content}
-        </ReactMarkdown>
-      ) : (
-        <div
-          className={cn(
-            "italic text-center py-12",
-            isDarkMode ? "text-blue-200/60" : "text-gray-400"
-          )}
-        >
-          <div className="text-4xl mb-4">✨</div>
-          <p className={isDarkMode ? "text-blue-200" : "text-gray-600"}>
-            Start typing to see your content come to life...
-          </p>
-          <p
-            className={cn(
-              "text-sm mt-2",
-              isDarkMode ? "text-blue-300/70" : "text-gray-500"
-            )}
-          >
-            Use{" "}
-            <code
-              className={cn(
-                "px-2 py-1 rounded",
-                isDarkMode
-                  ? "bg-blue-800/60 text-white"
-                  : cn(themeColors.codeBg, themeColors.codeText)
-              )}
-            >
-              /
-            </code>{" "}
-            commands for quick formatting
-          </p>
-        </div>
-      )}
-    </article>
-  );
+  const themeColors = darkThemes[colorTheme];
 
   const ThemeSelector = () => (
     <div className="absolute z-20 right-0 mt-2 w-36">
-      <div
-        className={cn(
-          "rounded-lg shadow-lg border",
-          isDarkMode
-            ? "bg-slate-800 border-slate-700"
-            : "bg-white border-gray-200"
-        )}
-      >
-        <button
-          onClick={() => {
-            setColorTheme("light");
-            setShowThemeMenu(false);
-          }}
-          className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 rounded-t-lg transition-colors",
-            colorTheme === "light" &&
-              (isDarkMode ? "bg-slate-700" : "bg-indigo-100"),
-            isDarkMode ? "text-white hover:bg-slate-700" : "text-gray-900 hover:bg-gray-100"
-          )}
-        >
-          Indigo
-        </button>
+      <div className="rounded-lg shadow-lg border bg-slate-800 border-slate-700">
         <button
           onClick={() => {
             setColorTheme("nord");
             setShowThemeMenu(false);
           }}
           className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
-            colorTheme === "nord" &&
-              (isDarkMode ? "bg-slate-700" : "bg-slate-100"),
-            isDarkMode
-              ? "text-white border-slate-700 hover:bg-slate-700"
-              : "text-gray-900 border-gray-200 hover:bg-gray-100"
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 rounded-t-lg transition-colors",
+            colorTheme === "nord" && "bg-slate-700",
+            "text-white hover:bg-slate-700"
           )}
         >
           Nord
@@ -1159,31 +739,12 @@ Tab - Indent`;
             setShowThemeMenu(false);
           }}
           className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
-            colorTheme === "slate" &&
-              (isDarkMode ? "bg-slate-700" : "bg-emerald-100"),
-            isDarkMode
-              ? "text-white border-slate-700 hover:bg-slate-700"
-              : "text-gray-900 border-gray-200 hover:bg-gray-100"
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t rounded-b-lg transition-colors",
+            colorTheme === "slate" && "bg-slate-700",
+            "text-white border-slate-700 hover:bg-slate-700"
           )}
         >
           Emerald
-        </button>
-        <button
-          onClick={() => {
-            setColorTheme("ocean");
-            setShowThemeMenu(false);
-          }}
-          className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t rounded-b-lg transition-colors",
-            colorTheme === "ocean" &&
-              (isDarkMode ? "bg-slate-700" : "bg-cyan-100"),
-            isDarkMode
-              ? "text-white border-slate-700 hover:bg-slate-700"
-              : "text-gray-900 border-gray-200 hover:bg-gray-100"
-          )}
-        >
-          Ocean
         </button>
       </div>
     </div>
@@ -1191,10 +752,8 @@ Tab - Indent`;
 
   return (
     <div
-      className={cn(
-        "h-full w-full relative",
-        isDarkMode ? themeColors.bg : themeColors.bg
-      )}
+      ref={containerRef}
+      className={cn("h-full w-full relative", themeColors.bg)}
     >
       <input
         ref={fileInputRef}
@@ -1208,142 +767,232 @@ Tab - Indent`;
         <div className="relative">
           <Button
             onClick={() => setShowThemeMenu(!showThemeMenu)}
-            className="text-white bg-slate-700 hover:bg-slate-600"
+            className="text-white bg-slate-700 hover:bg-slate-600 h-8 sm:h-9 px-2 sm:px-3"
             size="sm"
           >
-            <Palette className="h-4 w-4 sm:mr-2" />
+            <Palette className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
             <span className="hidden sm:inline">Theme</span>
           </Button>
           {showThemeMenu && <ThemeSelector />}
         </div>
         <Button
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          className="text-white bg-slate-700 hover:bg-slate-600"
+          onClick={toggleFullscreen}
+          className="text-white bg-slate-700 hover:bg-slate-600 h-8 sm:h-9 px-2 sm:px-3"
           size="sm"
         >
-          {isDarkMode ? (
-            <Sun className="h-4 w-4 sm:mr-2" />
+          {isFullscreen ? (
+            <Minimize className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
           ) : (
-            <Moon className="h-4 w-4 sm:mr-2" />
+            <Maximize className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
           )}
-          <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
+          <span className="hidden sm:inline">
+            {isFullscreen ? "Exit" : "Full"}
+          </span>
         </Button>
         <Button
           onClick={triggerFileImport}
-          className="bg-purple-600 hover:bg-purple-700 text-white"
+          className="bg-purple-600 hover:bg-purple-700 text-white h-8 sm:h-9 px-2 sm:px-3"
           size="sm"
         >
-          <Upload className="h-4 w-4 sm:mr-2" />
+          <Upload className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
           <span className="hidden sm:inline">Import</span>
         </Button>
         <Button
           onClick={exportToPDF}
           disabled={isExporting || !content.trim()}
-          className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+          className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 h-8 sm:h-9 px-2 sm:px-3"
           size="sm"
         >
-          <Download className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">{isExporting ? "Exporting..." : "PDF"}</span>
-        </Button>
-        <Button
-          onClick={() => setIsEditMode(!isEditMode)}
-          className={cn(
-            "text-white",
-            isEditMode
-              ? "bg-green-600 hover:bg-green-700"
-              : "bg-blue-600 hover:bg-blue-700"
-          )}
-          size="sm"
-        >
-          {isEditMode ? (
-            <Eye className="h-4 w-4 sm:mr-2" />
-          ) : (
-            <Edit3 className="h-4 w-4 sm:mr-2" />
-          )}
-          <span className="hidden sm:inline">{isEditMode ? "Preview" : "Edit"}</span>
+          <Download className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+          <span className="hidden sm:inline">
+            {isExporting ? "Exporting..." : "PDF"}
+          </span>
         </Button>
       </div>
 
-      <Card
-        className={cn(
-          "h-full overflow-y-auto border-0",
-          isDarkMode
-            ? themeColors.cardBg
-            : cn(themeColors.cardBg, themeColors.cardBorder)
-        )}
-      >
-        {isEditMode ? (
-          <div className="relative h-full flex flex-col">
-            <div className="relative flex-grow">
-              <Textarea
-                ref={textareaRef}
-                value={content}
-                onChange={() => {}}
-                onInput={handleInput}
-                onKeyDown={handleKeyDown}
-                onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
-                className={cn(
-                  "absolute inset-0 w-full h-full p-4 sm:p-6 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm leading-relaxed bg-transparent",
-                  isDarkMode
-                    ? "text-gray-100 placeholder:text-gray-500"
-                    : cn(themeColors.text, "placeholder:text-gray-400")
-                )}
-                placeholder=""
-                style={{
-                  minHeight: "100%",
-                  lineHeight: "1.6",
-                  fontFamily:
-                    'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Inconsolata, "Roboto Mono", monospace',
-                }}
-              />
-              {!content.trim() && (
-                <div
-                  className={cn(
-                    "absolute inset-4 sm:inset-6 pointer-events-none text-sm leading-relaxed whitespace-pre-line font-mono",
-                    isDarkMode ? "text-gray-500" : "text-gray-400"
-                  )}
-                >
+      <Card className={cn("h-full overflow-hidden border-0", themeColors.cardBg)}>
+        <div className="relative h-full">
+          <div className="absolute inset-0 overflow-y-auto">
+            <Textarea
+              ref={textareaRef}
+              value={content}
+              onChange={() => {}}
+              onInput={handleInput}
+              onKeyDown={handleKeyDown}
+              onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
+              className="absolute inset-0 w-full h-full p-4 sm:p-6 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm leading-relaxed bg-transparent text-transparent caret-white selection:bg-blue-500/30 z-20"
+              placeholder=""
+              style={{
+                minHeight: "100%",
+                lineHeight: "1.8",
+                fontFamily:
+                  'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Inconsolata, "Roboto Mono", monospace',
+              }}
+            />
+
+            <div
+              ref={overlayRef}
+              className="absolute inset-0 p-4 sm:p-6 pointer-events-none z-10"
+              style={{
+                lineHeight: "1.8",
+                fontFamily:
+                  'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Inconsolata, "Roboto Mono", monospace',
+              }}
+            >
+              {!content.trim() ? (
+                <div className="text-sm text-gray-500 whitespace-pre-line">
                   {getPlaceholderText()}
                 </div>
+              ) : (
+                <article
+                  ref={previewRef}
+                  className="prose prose-sm max-w-none prose-invert prose-headings:text-white prose-p:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-blockquote:text-gray-300"
+                >
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      code: (props) => <CodeBlock {...props} theme={colorTheme} />,
+                      blockquote(props) {
+                        const blockquoteContent = extractTextContent(props.children);
+                        return (
+                          <div className="relative group">
+                            <CopyButton content={blockquoteContent} theme={colorTheme} />
+                            <blockquote className="border-l-4 pl-4 py-2 italic my-4 rounded-r-md border-blue-500 bg-blue-900/30 text-gray-100">
+                              {props.children}
+                            </blockquote>
+                          </div>
+                        );
+                      },
+                      p(props) {
+                        const paragraphContent = extractTextContent(props.children);
+                        return (
+                          <div className="relative group">
+                            <CopyButton content={paragraphContent} theme={colorTheme} />
+                            <p className="text-gray-300">{props.children}</p>
+                          </div>
+                        );
+                      },
+                      strong(props) {
+                        return (
+                          <strong className="font-bold text-white">
+                            {props.children}
+                          </strong>
+                        );
+                      },
+                      em(props) {
+                        return (
+                          <em className="italic text-blue-200">{props.children}</em>
+                        );
+                      },
+                      a(props) {
+                        const href = props.href || "";
+                        const secureHref = href.startsWith("http://")
+                          ? href.replace("http://", "https://")
+                          : href.startsWith("https://") ||
+                              href.startsWith("/") ||
+                              href.startsWith("#")
+                            ? href
+                            : `https://${href}`;
+
+                        return (
+                          <a
+                            href={secureHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline text-blue-400 hover:text-blue-300 pointer-events-auto"
+                          >
+                            {props.children}
+                          </a>
+                        );
+                      },
+                      table(props) {
+                        return (
+                          <div className="overflow-x-auto my-4">
+                            <table className="w-full border-collapse border rounded-lg border-blue-600">
+                              {props.children}
+                            </table>
+                          </div>
+                        );
+                      },
+                      th(props) {
+                        return (
+                          <th className="border px-4 py-2 font-semibold text-left border-blue-600 bg-blue-900/60 text-white">
+                            {props.children}
+                          </th>
+                        );
+                      },
+                      td(props) {
+                        return (
+                          <td className="border px-4 py-2 border-blue-600 text-gray-100">
+                            {props.children}
+                          </td>
+                        );
+                      },
+                      ul(props) {
+                        return (
+                          <ul className="list-disc list-inside space-y-1 text-gray-100">
+                            {props.children}
+                          </ul>
+                        );
+                      },
+                      ol(props) {
+                        return (
+                          <ol className="list-decimal list-inside space-y-1 text-gray-100">
+                            {props.children}
+                          </ol>
+                        );
+                      },
+                      li(props) {
+                        return <li className="text-gray-100">{props.children}</li>;
+                      },
+                      h1(props) {
+                        return <h1 className="font-bold text-white text-3xl">{props.children}</h1>;
+                      },
+                      h2(props) {
+                        return <h2 className="font-bold text-white text-2xl">{props.children}</h2>;
+                      },
+                      h3(props) {
+                        return <h3 className="font-bold text-white text-xl">{props.children}</h3>;
+                      },
+                    }}
+                  >
+                    {content}
+                  </ReactMarkdown>
+                </article>
               )}
             </div>
-            <CardFooter
-              className={cn(
-                "py-2 px-4 sm:px-6 border-t",
-                isDarkMode
-                  ? cn(themeColors.cardBorder, "bg-opacity-50")
-                  : cn(themeColors.cardBorder, "bg-white/50")
-              )}
-            >
-              <div className="flex items-center justify-between w-full">
-                <div
-                  className={cn(
-                    "flex items-center gap-2 text-xs",
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "h-2 w-2 rounded-full",
-                      isConnected ? "bg-green-500" : "bg-red-500"
-                    )}
-                  />
-                  <span>{isConnected ? "Connected" : "Disconnected"}</span>
-                </div>
-                <div
-                  className={cn(
-                    "text-xs",
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  )}
-                >
-                  {content.length} chars | Line {content.substring(0, cursorPosition).split("\n").length}
-                </div>
-              </div>
-            </CardFooter>
           </div>
-        ) : (
-          <PreviewContent />
-        )}
+
+          <CardFooter
+            className={cn(
+              "absolute bottom-0 left-0 right-0 py-2 px-4 sm:px-6 border-t bg-opacity-95 backdrop-blur-sm z-30",
+              themeColors.cardBorder,
+              themeColors.cardBg
+            )}
+          >
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <div
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    isConnected ? "bg-green-500" : "bg-red-500"
+                  )}
+                />
+                <span className="hidden xs:inline">
+                  {isConnected ? "Connected" : "Disconnected"}
+                </span>
+              </div>
+              <div className="text-xs text-gray-400">
+                <span className="hidden sm:inline">
+                  {content.length} chars |{" "}
+                </span>
+                <span>
+                  Line {content.substring(0, cursorPosition).split("\n").length}
+                </span>
+              </div>
+            </div>
+          </CardFooter>
+        </div>
       </Card>
     </div>
   );
