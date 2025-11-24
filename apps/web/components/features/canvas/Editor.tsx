@@ -24,6 +24,7 @@ import { Card, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// ... [All interfaces and theme objects remain exactly the same] ...
 interface EditorProps {
   canvasId: string;
   initialContent: string;
@@ -224,7 +225,7 @@ const darkThemes: Record<ColorTheme, ThemeColors> = {
     cardBorder: "border-cyan-800",
   },
 };
-
+// ... [CopyButton, CodeBlock, extractTextContent functions remain exactly the same] ...
 function CopyButton({
   content,
   isDarkMode,
@@ -371,6 +372,7 @@ function extractTextContent(node: ReactNode): string {
   return "";
 }
 
+
 export function Editor({ canvasId, initialContent }: EditorProps) {
   const [content, setContent] = useState(initialContent);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -410,6 +412,7 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     }
   }, [debouncedContent, canvasId, isConnected, socket]);
 
+  // ... [handleKeyDown, handleInput, insertText, wrapSelection, getPlaceholderText, exportToPDF, handleImportFile, triggerFileImport functions remain exactly the same] ...
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget;
     const { selectionStart, selectionEnd } = textarea;
@@ -847,17 +850,23 @@ Tab - Indent`;
   const PreviewContent = () => (
     <article
       ref={previewRef}
+      // ✨ NEW: Added onDoubleClick to switch to edit mode
+      onDoubleClick={() => setIsEditMode(true)}
+      title="Double-click to edit"
       className={cn(
         "prose max-w-none p-4 sm:p-6",
         isDarkMode
           ? "prose-invert prose-headings:text-white prose-p:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-blockquote:text-gray-300"
-          : ""
+          : "",
+        // ✨ NEW: Added cursor-pointer to indicate interactivity
+        "cursor-pointer" 
       )}
     >
       {content.trim() ? (
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
+            // ... [CodeBlock and other custom components remain the same] ...
             code: (props) => (
               <CodeBlock
                 {...props}
@@ -876,13 +885,14 @@ Tab - Indent`;
                   />
                   <blockquote
                     className={cn(
-                      "border-l-4 pl-4 py-2 italic my-4 rounded-r-md",
+                      "border-l-4 pl-4 py-2 italic my-4 rounded-r-md transition-colors", // ✨ NEW: Added transition
                       isDarkMode
-                        ? "border-blue-500 bg-blue-900/30 text-gray-100"
+                        ? "border-blue-500 bg-blue-900/30 text-gray-100 hover:bg-blue-900/50" // ✨ NEW: Added hover
                         : cn(
                             themeColors.blockquoteBorder,
                             themeColors.blockquoteBg,
-                            themeColors.blockquoteText
+                            themeColors.blockquoteText,
+                            "hover:bg-opacity-80" // ✨ NEW: Added hover
                           )
                     )}
                   >
@@ -900,7 +910,11 @@ Tab - Indent`;
                     isDarkMode={isDarkMode}
                     theme={colorTheme}
                   />
-                  <p className={isDarkMode ? "text-gray-300" : themeColors.text}>
+                  {/* ✨ NEW: Added hover effect to paragraphs */}
+                  <p className={cn(
+                    "p-1 rounded-md transition-colors",
+                    isDarkMode ? "text-gray-300 hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
+                  )}>
                     {props.children}
                   </p>
                 </div>
@@ -1011,8 +1025,8 @@ Tab - Indent`;
               return (
                 <ul
                   className={cn(
-                    "list-disc list-inside space-y-1",
-                    isDarkMode ? "text-gray-100" : themeColors.text
+                    "list-disc list-inside space-y-1 p-1 rounded-md transition-colors", // ✨ NEW: Added hover styles
+                    isDarkMode ? "text-gray-100 hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
                   )}
                 >
                   {props.children}
@@ -1023,8 +1037,8 @@ Tab - Indent`;
               return (
                 <ol
                   className={cn(
-                    "list-decimal list-inside space-y-1",
-                    isDarkMode ? "text-gray-100" : themeColors.text
+                    "list-decimal list-inside space-y-1 p-1 rounded-md transition-colors", // ✨ NEW: Added hover styles
+                    isDarkMode ? "text-gray-100 hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
                   )}
                 >
                   {props.children}
@@ -1042,8 +1056,8 @@ Tab - Indent`;
               return (
                 <h1
                   className={cn(
-                    "font-bold",
-                    isDarkMode ? "text-white" : themeColors.text
+                    "font-bold p-1 rounded-md transition-colors", // ✨ NEW: Added hover styles
+                    isDarkMode ? "text-white hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
                   )}
                 >
                   {props.children}
@@ -1054,8 +1068,8 @@ Tab - Indent`;
               return (
                 <h2
                   className={cn(
-                    "font-bold",
-                    isDarkMode ? "text-white" : themeColors.text
+                    "font-bold p-1 rounded-md transition-colors", // ✨ NEW: Added hover styles
+                    isDarkMode ? "text-white hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
                   )}
                 >
                   {props.children}
@@ -1066,8 +1080,8 @@ Tab - Indent`;
               return (
                 <h3
                   className={cn(
-                    "font-bold",
-                    isDarkMode ? "text-white" : themeColors.text
+                    "font-bold p-1 rounded-md transition-colors", // ✨ NEW: Added hover styles
+                    isDarkMode ? "text-white hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
                   )}
                 >
                   {props.children}
@@ -1113,6 +1127,7 @@ Tab - Indent`;
     </article>
   );
 
+  // ... [ThemeSelector component remains exactly the same] ...
   const ThemeSelector = () => (
     <div className="absolute z-20 right-0 mt-2 w-36">
       <div
