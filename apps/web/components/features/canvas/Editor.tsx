@@ -3,7 +3,10 @@
 import { useState, useEffect, useRef, ReactNode, DragEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeRaw from "rehype-raw";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
@@ -22,9 +25,10 @@ import {
   AlignJustify,
   Type,
   Baseline,
-  Highlighter, // ✨ NEW: Icon for highlighter
-  FileUp,      // ✨ NEW: Icon for drag & drop overlay
-  Scaling,     // ✨ NEW: Icon for text size
+  Highlighter,
+  FileUp,
+  Scaling,
+  Sigma,
 } from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
@@ -40,6 +44,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+
+// ------------------------------------------------------------------
+// 1. Interfaces & Types
+// ------------------------------------------------------------------
 
 interface EditorProps {
   canvasId: string;
@@ -76,7 +84,10 @@ interface ThemeColors {
   cardBorder: string;
 }
 
-// Fonts
+// ------------------------------------------------------------------
+// 2. Constants (Defined BEFORE Usage)
+// ------------------------------------------------------------------
+
 const FONT_OPTIONS = [
   { label: "Default", value: "inherit" },
   { label: "Sans Serif", value: "sans-serif" },
@@ -86,7 +97,6 @@ const FONT_OPTIONS = [
   { label: "Fantasy", value: "fantasy" },
 ];
 
-// ✨ NEW: Font Sizes
 const FONT_SIZE_OPTIONS = [
   { label: "Small", value: "12px" },
   { label: "Normal", value: "16px" },
@@ -262,7 +272,24 @@ const darkThemes: Record<ColorTheme, ThemeColors> = {
   },
 };
 
-// ... [CopyButton, CodeBlock, extractTextContent remain the same] ...
+// ------------------------------------------------------------------
+// 3. Helper Functions & Components (Defined AFTER constants)
+// ------------------------------------------------------------------
+
+function extractTextContent(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(extractTextContent).join("");
+  }
+  if (node && typeof node === "object" && "props" in node) {
+    const element = node as { props: { children?: ReactNode } };
+    return extractTextContent(element.props.children);
+  }
+  return "";
+}
+
 function CopyButton({
   content,
   isDarkMode,
@@ -395,19 +422,9 @@ function CodeBlock({
   );
 }
 
-function extractTextContent(node: ReactNode): string {
-  if (typeof node === "string" || typeof node === "number") {
-    return String(node);
-  }
-  if (Array.isArray(node)) {
-    return node.map(extractTextContent).join("");
-  }
-  if (node && typeof node === "object" && "props" in node) {
-    const element = node as { props: { children?: ReactNode } };
-    return extractTextContent(element.props.children);
-  }
-  return "";
-}
+// ------------------------------------------------------------------
+// 4. Main Component
+// ------------------------------------------------------------------
 
 export function Editor({ canvasId, initialContent }: EditorProps) {
   const [content, setContent] = useState(initialContent);
@@ -417,7 +434,7 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [colorTheme, setColorTheme] = useState<ColorTheme>("light");
   const [showThemeMenu, setShowThemeMenu] = useState(false);
-  const [isDragging, setIsDragging] = useState(false); // ✨ NEW: State for drag-drop
+  const [isDragging, setIsDragging] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -481,7 +498,6 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     }, 0);
   };
 
-  // ✨ NEW: Drag and Drop Handlers
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -497,7 +513,6 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    // Necessary to allow dropping
   };
 
   const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
@@ -511,14 +526,9 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     const file = files[0];
     const textarea = textareaRef.current;
     
-    // Determine insertion point (at cursor or end if not focused)
     let insertPos = textarea ? textarea.selectionStart : content.length;
-    // If we dropped on preview, just append to end or try to be smart, 
-    // but usually drag-drop works best when dropping ON the textarea in edit mode.
-    // If not in edit mode, we switch to edit mode.
     if (!isEditMode) setIsEditMode(true);
 
-    // Wait a tick for Edit Mode to render if it wasn't active
     setTimeout(async () => {
         const currentTextarea = textareaRef.current;
         if (currentTextarea) {
@@ -526,7 +536,6 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
         }
 
         if (file.type.startsWith("image/")) {
-            // Handle Image Drop -> Convert to Base64
             const reader = new FileReader();
             reader.onload = (event) => {
                 const base64 = event.target?.result as string;
@@ -535,14 +544,12 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
             };
             reader.readAsDataURL(file);
         } else {
-            // Handle Text/Code Drop -> Read content
             const reader = new FileReader();
             reader.onload = (event) => {
                 const text = event.target?.result as string;
                 const fileExtension = file.name.split('.').pop()?.toLowerCase();
                 let importedContent = text;
                 
-                // Wrap in code block if it's a code file
                 const codeExtensions = ['js', 'ts', 'py', 'java', 'c', 'cpp', 'json', 'html', 'css'];
                 if (codeExtensions.includes(fileExtension || '')) {
                      importedContent = `\n\`\`\`${fileExtension}\n${text}\n\`\`\`\n`;
@@ -565,7 +572,6 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
       isLocalChange.current = true;
   };
 
-  // ... [handleKeyDown, handleInput, insertText, wrapSelection, getPlaceholderText, exportToPDF, handleImportFile, triggerFileImport remain the same] ...
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget;
     const { selectionStart, selectionEnd } = textarea;
@@ -705,6 +711,10 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
               "| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |";
             cursorOffset = 12;
             break;
+          case "math":
+            replacement = "\n$$\nx = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}\n$$\n";
+            cursorOffset = 41;
+            break;
         }
 
         if (replacement) {
@@ -780,6 +790,7 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
       return `Type '/' for commands, or start writing...
 
 Quick Commands:
+/math [space] - Insert equation
 /js [space] - JavaScript code block
 /ts [space] - TypeScript code block  
 /py [space] - Python code block
@@ -820,7 +831,7 @@ Tab - Indent`;
         const borderColor = computedStyle.borderColor;
         const textAlign = computedStyle.textAlign; 
         const fontFamily = computedStyle.fontFamily;
-        const fontSize = computedStyle.fontSize; // ✨ NEW: Capture size
+        const fontSize = computedStyle.fontSize;
 
         if (color && color !== "rgba(0, 0, 0, 0)" && !color.includes("oklch")) {
           htmlElement.style.color = color;
@@ -857,6 +868,7 @@ Tab - Indent`;
           <head>
             <meta charset="utf-8">
             <title>Canvas Export - ${canvasId}</title>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.css">
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
               body {
@@ -879,6 +891,7 @@ Tab - Indent`;
               th, td { border: 1px solid rgb(221, 221, 221); padding: 12px; text-align: left; }
               th { background: rgb(245, 245, 245); font-weight: bold; }
               button { display: none !important; }
+              .katex { font-size: 1.1em; } 
               @media print { body { padding: 20px; } @page { margin: 2cm; } }
             </style>
           </head>
@@ -894,7 +907,7 @@ Tab - Indent`;
           printWindow.print();
           printWindow.close();
           setIsExporting(false);
-        }, 250);
+        }, 500);
       };
     } catch (error) {
       console.error("Failed to export PDF:", error);
@@ -908,7 +921,6 @@ Tab - Indent`;
   };
 
   const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // ... [Original Import Logic]
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -1007,6 +1019,233 @@ Tab - Indent`;
 
   const themeColors = isDarkMode ? darkThemes[colorTheme] : lightThemes[colorTheme];
 
+  const ThemeSelector = () => (
+    <div className="absolute z-20 right-0 mt-2 w-36">
+      <div
+        className={cn(
+          "rounded-lg shadow-lg border",
+          isDarkMode
+            ? "bg-slate-800 border-slate-700"
+            : "bg-white border-gray-200"
+        )}
+      >
+        <button
+          onClick={() => {
+            setColorTheme("light");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 rounded-t-lg transition-colors",
+            colorTheme === "light" &&
+              (isDarkMode ? "bg-slate-700" : "bg-indigo-100"),
+            isDarkMode ? "text-white hover:bg-slate-700" : "text-gray-900 hover:bg-gray-100"
+          )}
+        >
+          Indigo
+        </button>
+        <button
+          onClick={() => {
+            setColorTheme("nord");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
+            colorTheme === "nord" &&
+              (isDarkMode ? "bg-slate-700" : "bg-slate-100"),
+            isDarkMode
+              ? "text-white border-slate-700 hover:bg-slate-700"
+              : "text-gray-900 border-gray-200 hover:bg-gray-100"
+          )}
+        >
+          Nord
+        </button>
+        <button
+          onClick={() => {
+            setColorTheme("slate");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
+            colorTheme === "slate" &&
+              (isDarkMode ? "bg-slate-700" : "bg-emerald-100"),
+            isDarkMode
+              ? "text-white border-slate-700 hover:bg-slate-700"
+              : "text-gray-900 border-gray-200 hover:bg-gray-100"
+          )}
+        >
+          Emerald
+        </button>
+        <button
+          onClick={() => {
+            setColorTheme("ocean");
+            setShowThemeMenu(false);
+          }}
+          className={cn(
+            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t rounded-b-lg transition-colors",
+            colorTheme === "ocean" &&
+              (isDarkMode ? "bg-slate-700" : "bg-cyan-100"),
+            isDarkMode
+              ? "text-white border-slate-700 hover:bg-slate-700"
+              : "text-gray-900 border-gray-200 hover:bg-gray-100"
+          )}
+        >
+          Ocean
+        </button>
+      </div>
+    </div>
+  );
+
+  const FormattingToolbar = () => (
+    <div className={cn(
+        "flex flex-wrap items-center gap-2 p-2 border-b",
+        isDarkMode ? "border-slate-700 bg-slate-900/50" : "border-gray-200 bg-gray-50/50"
+    )}>
+        {/* Alignment Tools */}
+        <div className="flex items-center rounded-md border overflow-hidden shadow-sm">
+            <Button
+                variant="ghost"
+                size="sm"
+                className={cn("h-8 w-8 p-1 rounded-none", isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700")}
+                onClick={() => insertHtmlTag('<div style="text-align: left">', '</div>', true)}
+                title="Align Left"
+            >
+                <AlignLeft className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
+                onClick={() => insertHtmlTag('<div style="text-align: center">', '</div>', true)}
+                title="Align Center"
+            >
+                <AlignCenter className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
+                onClick={() => insertHtmlTag('<div style="text-align: right">', '</div>', true)}
+                title="Align Right"
+            >
+                <AlignRight className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
+                onClick={() => insertHtmlTag('<div style="text-align: justify">', '</div>', true)}
+                title="Align Justify"
+            >
+                <AlignJustify className="h-4 w-4" />
+            </Button>
+        </div>
+
+        <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
+
+        {/* Font Family Selector */}
+        <div className="flex items-center gap-1">
+            <Type className={cn("h-4 w-4 mr-1", isDarkMode ? "text-gray-400" : "text-gray-500")} />
+            <Select onValueChange={(value) => insertHtmlTag(`<span style="font-family: ${value}">`, '</span>')}>
+                <SelectTrigger className={cn("h-8 w-[120px] text-xs shadow-sm", isDarkMode ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-300 text-gray-900")}>
+                    <SelectValue placeholder="Font" />
+                </SelectTrigger>
+                <SelectContent>
+                    {FONT_OPTIONS.map((font) => (
+                        <SelectItem key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+                            {font.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+
+        {/* Font Size Selector */}
+        <div className="flex items-center gap-1">
+            <Scaling className={cn("h-4 w-4 mr-1", isDarkMode ? "text-gray-400" : "text-gray-500")} />
+            <Select onValueChange={(value) => insertHtmlTag(`<span style="font-size: ${value}">`, '</span>')}>
+                <SelectTrigger className={cn("h-8 w-[100px] text-xs shadow-sm", isDarkMode ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-300 text-gray-900")}>
+                    <SelectValue placeholder="Size" />
+                </SelectTrigger>
+                <SelectContent>
+                    {FONT_SIZE_OPTIONS.map((size) => (
+                        <SelectItem key={size.value} value={size.value}>
+                            {size.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+
+        <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
+
+        {/* Color Pickers */}
+        <div className="flex items-center gap-2 group relative">
+             <div className="relative">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                        "h-8 w-8 p-1 relative overflow-hidden",
+                        isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700"
+                    )}
+                    title="Text Color"
+                    onClick={() => {
+                        const colorInput = document.getElementById("text-color-picker");
+                        if (colorInput) colorInput.click();
+                    }}
+                >
+                    <Baseline className="h-4 w-4" />
+                    <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-gradient-to-tr from-red-500 via-green-500 to-blue-500" />
+                </Button>
+                <input
+                    type="color"
+                    id="text-color-picker"
+                    className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
+                    onChange={(e) => insertHtmlTag(`<span style="color: ${e.target.value}">`, '</span>')}
+                />
+             </div>
+
+             <div className="relative">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                        "h-8 w-8 p-1 relative overflow-hidden",
+                        isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700"
+                    )}
+                    title="Highlight Text"
+                    onClick={() => {
+                        const bgInput = document.getElementById("bg-color-picker");
+                        if (bgInput) bgInput.click();
+                    }}
+                >
+                    <Highlighter className="h-4 w-4" />
+                    <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 border border-black/10" />
+                </Button>
+                <input
+                    type="color"
+                    id="bg-color-picker"
+                    className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
+                    onChange={(e) => insertHtmlTag(`<span style="background-color: ${e.target.value}">`, '</span>')}
+                />
+             </div>
+        </div>
+
+        <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
+
+        {/* Math Button */}
+        <Button
+            variant="ghost"
+            size="sm"
+            className={cn("h-8 w-8 p-1", isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700")}
+            onClick={() => insertHtmlTag('\n$$\n', '\n$$\n', false)}
+            title="Insert Equation"
+        >
+            <Sigma className="h-4 w-4" />
+        </Button>
+    </div>
+  );
+
   const PreviewContent = () => (
     <article
       ref={previewRef}
@@ -1022,10 +1261,9 @@ Tab - Indent`;
     >
       {content.trim() ? (
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeRaw]}
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex, rehypeRaw]}
           components={{
-            // ... [CodeBlock and other custom components] ...
             code: (props) => (
               <CodeBlock
                 {...props}
@@ -1291,229 +1529,12 @@ Tab - Indent`;
     </article>
   );
 
-  const ThemeSelector = () => (
-    <div className="absolute z-20 right-0 mt-2 w-36">
-      <div
-        className={cn(
-          "rounded-lg shadow-lg border",
-          isDarkMode
-            ? "bg-slate-800 border-slate-700"
-            : "bg-white border-gray-200"
-        )}
-      >
-        <button
-          onClick={() => {
-            setColorTheme("light");
-            setShowThemeMenu(false);
-          }}
-          className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 rounded-t-lg transition-colors",
-            colorTheme === "light" &&
-              (isDarkMode ? "bg-slate-700" : "bg-indigo-100"),
-            isDarkMode ? "text-white hover:bg-slate-700" : "text-gray-900 hover:bg-gray-100"
-          )}
-        >
-          Indigo
-        </button>
-        <button
-          onClick={() => {
-            setColorTheme("nord");
-            setShowThemeMenu(false);
-          }}
-          className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
-            colorTheme === "nord" &&
-              (isDarkMode ? "bg-slate-700" : "bg-slate-100"),
-            isDarkMode
-              ? "text-white border-slate-700 hover:bg-slate-700"
-              : "text-gray-900 border-gray-200 hover:bg-gray-100"
-          )}
-        >
-          Nord
-        </button>
-        <button
-          onClick={() => {
-            setColorTheme("slate");
-            setShowThemeMenu(false);
-          }}
-          className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
-            colorTheme === "slate" &&
-              (isDarkMode ? "bg-slate-700" : "bg-emerald-100"),
-            isDarkMode
-              ? "text-white border-slate-700 hover:bg-slate-700"
-              : "text-gray-900 border-gray-200 hover:bg-gray-100"
-          )}
-        >
-          Emerald
-        </button>
-        <button
-          onClick={() => {
-            setColorTheme("ocean");
-            setShowThemeMenu(false);
-          }}
-          className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t rounded-b-lg transition-colors",
-            colorTheme === "ocean" &&
-              (isDarkMode ? "bg-slate-700" : "bg-cyan-100"),
-            isDarkMode
-              ? "text-white border-slate-700 hover:bg-slate-700"
-              : "text-gray-900 border-gray-200 hover:bg-gray-100"
-          )}
-        >
-          Ocean
-        </button>
-      </div>
-    </div>
-  );
-
-  const FormattingToolbar = () => (
-    <div className={cn(
-        "flex flex-wrap items-center gap-2 p-2 border-b",
-        isDarkMode ? "border-slate-700 bg-slate-900/50" : "border-gray-200 bg-gray-50/50"
-    )}>
-        {/* Alignment Tools */}
-        <div className="flex items-center rounded-md border overflow-hidden shadow-sm">
-            <Button
-                variant="ghost"
-                size="sm"
-                className={cn("h-8 w-8 p-1 rounded-none", isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700")}
-                onClick={() => insertHtmlTag('<div style="text-align: left">', '</div>', true)}
-                title="Align Left"
-            >
-                <AlignLeft className="h-4 w-4" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="sm"
-                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
-                onClick={() => insertHtmlTag('<div style="text-align: center">', '</div>', true)}
-                title="Align Center"
-            >
-                <AlignCenter className="h-4 w-4" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="sm"
-                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
-                onClick={() => insertHtmlTag('<div style="text-align: right">', '</div>', true)}
-                title="Align Right"
-            >
-                <AlignRight className="h-4 w-4" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="sm"
-                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
-                onClick={() => insertHtmlTag('<div style="text-align: justify">', '</div>', true)}
-                title="Align Justify"
-            >
-                <AlignJustify className="h-4 w-4" />
-            </Button>
-        </div>
-
-        <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
-
-        {/* Font Family Selector */}
-        <div className="flex items-center gap-1">
-            <Type className={cn("h-4 w-4 mr-1", isDarkMode ? "text-gray-400" : "text-gray-500")} />
-            <Select onValueChange={(value) => insertHtmlTag(`<span style="font-family: ${value}">`, '</span>')}>
-                <SelectTrigger className={cn("h-8 w-[120px] text-xs shadow-sm", isDarkMode ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-300 text-gray-900")}>
-                    <SelectValue placeholder="Font" />
-                </SelectTrigger>
-                <SelectContent>
-                    {FONT_OPTIONS.map((font) => (
-                        <SelectItem key={font.value} value={font.value} style={{ fontFamily: font.value }}>
-                            {font.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </div>
-
-        {/* ✨ NEW: Font Size Selector */}
-        <div className="flex items-center gap-1">
-            <Scaling className={cn("h-4 w-4 mr-1", isDarkMode ? "text-gray-400" : "text-gray-500")} />
-            <Select onValueChange={(value) => insertHtmlTag(`<span style="font-size: ${value}">`, '</span>')}>
-                <SelectTrigger className={cn("h-8 w-[100px] text-xs shadow-sm", isDarkMode ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-300 text-gray-900")}>
-                    <SelectValue placeholder="Size" />
-                </SelectTrigger>
-                <SelectContent>
-                    {FONT_SIZE_OPTIONS.map((size) => (
-                        <SelectItem key={size.value} value={size.value}>
-                            {size.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </div>
-
-        <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
-
-        {/* Color Pickers */}
-        <div className="flex items-center gap-2 group relative">
-             {/* Text Color */}
-             <div className="relative">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                        "h-8 w-8 p-1 relative overflow-hidden",
-                        isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700"
-                    )}
-                    title="Text Color"
-                    onClick={() => {
-                        const colorInput = document.getElementById("text-color-picker");
-                        if (colorInput) colorInput.click();
-                    }}
-                >
-                    <Baseline className="h-4 w-4" />
-                    <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-gradient-to-tr from-red-500 via-green-500 to-blue-500" />
-                </Button>
-                <input
-                    type="color"
-                    id="text-color-picker"
-                    className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
-                    onChange={(e) => insertHtmlTag(`<span style="color: ${e.target.value}">`, '</span>')}
-                />
-             </div>
-
-             {/* ✨ NEW: Highlight Color */}
-             <div className="relative">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                        "h-8 w-8 p-1 relative overflow-hidden",
-                        isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700"
-                    )}
-                    title="Highlight Text"
-                    onClick={() => {
-                        const bgInput = document.getElementById("bg-color-picker");
-                        if (bgInput) bgInput.click();
-                    }}
-                >
-                    <Highlighter className="h-4 w-4" />
-                    <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 border border-black/10" />
-                </Button>
-                <input
-                    type="color"
-                    id="bg-color-picker"
-                    className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
-                    onChange={(e) => insertHtmlTag(`<span style="background-color: ${e.target.value}">`, '</span>')}
-                />
-             </div>
-        </div>
-    </div>
-  );
-
   return (
     <div
       className={cn(
         "h-full w-full relative",
         isDarkMode ? themeColors.bg : themeColors.bg
       )}
-      // ✨ NEW: Drag and drop event listeners on the main container
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -1527,7 +1548,6 @@ Tab - Indent`;
         className="hidden"
       />
 
-      {/* ✨ NEW: Drag Overlay */}
       {isDragging && (
         <div className="absolute inset-0 z-50 bg-blue-500/20 backdrop-blur-sm border-4 border-dashed border-blue-500 m-4 rounded-xl flex items-center justify-center pointer-events-none">
             <div className="bg-white/90 dark:bg-slate-800/90 p-8 rounded-xl shadow-xl flex flex-col items-center gap-4">
