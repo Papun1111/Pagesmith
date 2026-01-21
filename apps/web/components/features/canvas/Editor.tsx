@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw"; // ✨ NEW: Required to render HTML styles (colors, fonts, alignment)
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
@@ -15,6 +16,12 @@ import {
   Moon,
   Sun,
   Palette,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  Type,
+  Baseline,
 } from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
@@ -22,9 +29,16 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-// ... [All interfaces and theme objects remain exactly the same] ...
+// ... [Interfaces remain unchanged] ...
 interface EditorProps {
   canvasId: string;
   initialContent: string;
@@ -59,6 +73,16 @@ interface ThemeColors {
   cardBg: string;
   cardBorder: string;
 }
+
+// ✨ NEW: Available Fonts
+const FONT_OPTIONS = [
+  { label: "Default", value: "inherit" },
+  { label: "Sans Serif", value: "sans-serif" },
+  { label: "Serif", value: "serif" },
+  { label: "Monospace", value: "monospace" },
+  { label: "Cursive", value: "cursive" },
+  { label: "Fantasy", value: "fantasy" },
+];
 
 const lightThemes: Record<ColorTheme, ThemeColors> = {
   light: {
@@ -225,7 +249,8 @@ const darkThemes: Record<ColorTheme, ThemeColors> = {
     cardBorder: "border-cyan-800",
   },
 };
-// ... [CopyButton, CodeBlock, extractTextContent functions remain exactly the same] ...
+
+// ... [CopyButton, CodeBlock, extractTextContent helper functions remain exactly the same] ...
 function CopyButton({
   content,
   isDarkMode,
@@ -372,7 +397,6 @@ function extractTextContent(node: ReactNode): string {
   return "";
 }
 
-
 export function Editor({ canvasId, initialContent }: EditorProps) {
   const [content, setContent] = useState(initialContent);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -412,7 +436,40 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     }
   }, [debouncedContent, canvasId, isConnected, socket]);
 
-  // ... [handleKeyDown, handleInput, insertText, wrapSelection, getPlaceholderText, exportToPDF, handleImportFile, triggerFileImport functions remain exactly the same] ...
+  // ✨ NEW: Helper to insert HTML tags for styling
+  const insertHtmlTag = (prefix: string, suffix: string, blockMode: boolean = false) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const { selectionStart, selectionEnd } = textarea;
+    const selectedText = content.substring(selectionStart, selectionEnd);
+    
+    // For block mode elements (like divs), we often want newlines to ensure markdown parses correctly inside
+    const pre = blockMode ? `\n\n${prefix}` : prefix;
+    const suf = blockMode ? `${suffix}\n\n` : suffix;
+
+    const newText = pre + selectedText + suf;
+    const newContent =
+      content.substring(0, selectionStart) +
+      newText +
+      content.substring(selectionEnd);
+
+    setContent(newContent);
+    isLocalChange.current = true;
+
+    setTimeout(() => {
+      textarea.focus();
+      // If text was selected, keep selection wrapped. If not, place cursor inside tags.
+      if (selectedText) {
+        textarea.selectionStart = selectionStart;
+        textarea.selectionEnd = selectionEnd + pre.length + suf.length;
+      } else {
+        textarea.selectionStart = selectionStart + pre.length;
+        textarea.selectionEnd = selectionStart + pre.length;
+      }
+    }, 0);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget;
     const { selectionStart, selectionEnd } = textarea;
@@ -665,6 +722,8 @@ Tab - Indent`;
         const color = computedStyle.color;
         const backgroundColor = computedStyle.backgroundColor;
         const borderColor = computedStyle.borderColor;
+        const textAlign = computedStyle.textAlign; // ✨ NEW: Capture alignment
+        const fontFamily = computedStyle.fontFamily; // ✨ NEW: Capture font
 
         if (color && color !== "rgba(0, 0, 0, 0)" && !color.includes("oklch")) {
           htmlElement.style.color = color;
@@ -682,6 +741,12 @@ Tab - Indent`;
           !borderColor.includes("oklch")
         ) {
           htmlElement.style.borderColor = borderColor;
+        }
+        if (textAlign) {
+            htmlElement.style.textAlign = textAlign;
+        }
+        if (fontFamily) {
+            htmlElement.style.fontFamily = fontFamily;
         }
       });
 
@@ -749,6 +814,7 @@ Tab - Indent`;
   };
 
   const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    // ... [Same import logic as before]
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -850,7 +916,6 @@ Tab - Indent`;
   const PreviewContent = () => (
     <article
       ref={previewRef}
-      // ✨ NEW: Added onDoubleClick to switch to edit mode
       onDoubleClick={() => setIsEditMode(true)}
       title="Double-click to edit"
       className={cn(
@@ -858,13 +923,13 @@ Tab - Indent`;
         isDarkMode
           ? "prose-invert prose-headings:text-white prose-p:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-blockquote:text-gray-300"
           : "",
-        // ✨ NEW: Added cursor-pointer to indicate interactivity
         "cursor-pointer" 
       )}
     >
       {content.trim() ? (
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeRaw]} // ✨ NEW: Allow parsing of HTML for style attributes
           components={{
             // ... [CodeBlock and other custom components remain the same] ...
             code: (props) => (
@@ -885,14 +950,14 @@ Tab - Indent`;
                   />
                   <blockquote
                     className={cn(
-                      "border-l-4 pl-4 py-2 italic my-4 rounded-r-md transition-colors", // ✨ NEW: Added transition
+                      "border-l-4 pl-4 py-2 italic my-4 rounded-r-md transition-colors",
                       isDarkMode
-                        ? "border-blue-500 bg-blue-900/30 text-gray-100 hover:bg-blue-900/50" // ✨ NEW: Added hover
+                        ? "border-blue-500 bg-blue-900/30 text-gray-100 hover:bg-blue-900/50"
                         : cn(
                             themeColors.blockquoteBorder,
                             themeColors.blockquoteBg,
                             themeColors.blockquoteText,
-                            "hover:bg-opacity-80" // ✨ NEW: Added hover
+                            "hover:bg-opacity-80"
                           )
                     )}
                   >
@@ -910,7 +975,6 @@ Tab - Indent`;
                     isDarkMode={isDarkMode}
                     theme={colorTheme}
                   />
-                  {/* ✨ NEW: Added hover effect to paragraphs */}
                   <p className={cn(
                     "p-1 rounded-md transition-colors",
                     isDarkMode ? "text-gray-300 hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
@@ -1025,7 +1089,7 @@ Tab - Indent`;
               return (
                 <ul
                   className={cn(
-                    "list-disc list-inside space-y-1 p-1 rounded-md transition-colors", // ✨ NEW: Added hover styles
+                    "list-disc list-inside space-y-1 p-1 rounded-md transition-colors",
                     isDarkMode ? "text-gray-100 hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
                   )}
                 >
@@ -1037,7 +1101,7 @@ Tab - Indent`;
               return (
                 <ol
                   className={cn(
-                    "list-decimal list-inside space-y-1 p-1 rounded-md transition-colors", // ✨ NEW: Added hover styles
+                    "list-decimal list-inside space-y-1 p-1 rounded-md transition-colors",
                     isDarkMode ? "text-gray-100 hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
                   )}
                 >
@@ -1056,7 +1120,7 @@ Tab - Indent`;
               return (
                 <h1
                   className={cn(
-                    "font-bold p-1 rounded-md transition-colors", // ✨ NEW: Added hover styles
+                    "font-bold p-1 rounded-md transition-colors",
                     isDarkMode ? "text-white hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
                   )}
                 >
@@ -1068,7 +1132,7 @@ Tab - Indent`;
               return (
                 <h2
                   className={cn(
-                    "font-bold p-1 rounded-md transition-colors", // ✨ NEW: Added hover styles
+                    "font-bold p-1 rounded-md transition-colors",
                     isDarkMode ? "text-white hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
                   )}
                 >
@@ -1080,7 +1144,7 @@ Tab - Indent`;
               return (
                 <h3
                   className={cn(
-                    "font-bold p-1 rounded-md transition-colors", // ✨ NEW: Added hover styles
+                    "font-bold p-1 rounded-md transition-colors",
                     isDarkMode ? "text-white hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
                   )}
                 >
@@ -1088,6 +1152,13 @@ Tab - Indent`;
                 </h3>
               );
             },
+            // ✨ NEW: Handlers for DIV and SPAN to ensure injected styles render correctly
+            div(props) {
+                return <div {...props} className={cn("my-2", props.className)} />;
+            },
+            span(props) {
+                return <span {...props} />;
+            }
           }}
         >
           {content}
@@ -1127,7 +1198,6 @@ Tab - Indent`;
     </article>
   );
 
-  // ... [ThemeSelector component remains exactly the same] ...
   const ThemeSelector = () => (
     <div className="absolute z-20 right-0 mt-2 w-36">
       <div
@@ -1201,6 +1271,105 @@ Tab - Indent`;
           Ocean
         </button>
       </div>
+    </div>
+  );
+
+  // ✨ NEW: Formatting Toolbar Component
+  const FormattingToolbar = () => (
+    <div className={cn(
+        "flex flex-wrap items-center gap-2 p-2 border-b",
+        isDarkMode ? "border-slate-700 bg-slate-900/50" : "border-gray-200 bg-gray-50/50"
+    )}>
+        {/* Alignment Tools */}
+        <div className="flex items-center rounded-md border overflow-hidden">
+            <Button
+                variant="ghost"
+                size="sm"
+                className={cn("h-8 w-8 p-1 rounded-none", isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700")}
+                onClick={() => insertHtmlTag('<div style="text-align: left">', '</div>', true)}
+                title="Align Left"
+            >
+                <AlignLeft className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
+                onClick={() => insertHtmlTag('<div style="text-align: center">', '</div>', true)}
+                title="Align Center"
+            >
+                <AlignCenter className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
+                onClick={() => insertHtmlTag('<div style="text-align: right">', '</div>', true)}
+                title="Align Right"
+            >
+                <AlignRight className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
+                onClick={() => insertHtmlTag('<div style="text-align: justify">', '</div>', true)}
+                title="Align Justify"
+            >
+                <AlignJustify className="h-4 w-4" />
+            </Button>
+        </div>
+
+        <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
+
+        {/* Font Family Selector */}
+        <div className="flex items-center gap-1">
+            <Type className={cn("h-4 w-4 mr-1", isDarkMode ? "text-gray-400" : "text-gray-500")} />
+            <Select onValueChange={(value) => insertHtmlTag(`<span style="font-family: ${value}">`, '</span>')}>
+                <SelectTrigger className={cn("h-8 w-[120px] text-xs", isDarkMode ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-300 text-gray-900")}>
+                    <SelectValue placeholder="Font Family" />
+                </SelectTrigger>
+                <SelectContent>
+                    {FONT_OPTIONS.map((font) => (
+                        <SelectItem key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+                            {font.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+
+        <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
+
+        {/* Color Picker (Wheel) */}
+        <div className="flex items-center gap-2 group relative">
+             <div className="relative">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                        "h-8 w-8 p-1 relative overflow-hidden",
+                        isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700"
+                    )}
+                    title="Text Color"
+                    onClick={() => {
+                        // Trigger the hidden color input
+                        const colorInput = document.getElementById("text-color-picker");
+                        if (colorInput) colorInput.click();
+                    }}
+                >
+                    <Baseline className="h-4 w-4" />
+                    <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-gradient-to-tr from-red-500 via-green-500 to-blue-500" />
+                </Button>
+                {/* Hidden Native Color Input */}
+                <input
+                    type="color"
+                    id="text-color-picker"
+                    className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
+                    onChange={(e) => insertHtmlTag(`<span style="color: ${e.target.value}">`, '</span>')}
+                />
+             </div>
+        </div>
     </div>
   );
 
@@ -1289,6 +1458,9 @@ Tab - Indent`;
       >
         {isEditMode ? (
           <div className="relative h-full flex flex-col">
+            {/* ✨ NEW: Render Formatting Toolbar only in Edit Mode */}
+            <FormattingToolbar />
+            
             <div className="relative flex-grow">
               <Textarea
                 ref={textareaRef}
