@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, ReactNode } from "react";
+import { useState, useEffect, useRef, ReactNode, DragEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw"; // ✨ NEW: Required to render HTML styles (colors, fonts, alignment)
+import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
@@ -22,6 +22,9 @@ import {
   AlignJustify,
   Type,
   Baseline,
+  Highlighter, // ✨ NEW: Icon for highlighter
+  FileUp,      // ✨ NEW: Icon for drag & drop overlay
+  Scaling,     // ✨ NEW: Icon for text size
 } from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
@@ -38,7 +41,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-// ... [Interfaces remain unchanged] ...
 interface EditorProps {
   canvasId: string;
   initialContent: string;
@@ -74,7 +76,7 @@ interface ThemeColors {
   cardBorder: string;
 }
 
-// ✨ NEW: Available Fonts
+// Fonts
 const FONT_OPTIONS = [
   { label: "Default", value: "inherit" },
   { label: "Sans Serif", value: "sans-serif" },
@@ -82,6 +84,16 @@ const FONT_OPTIONS = [
   { label: "Monospace", value: "monospace" },
   { label: "Cursive", value: "cursive" },
   { label: "Fantasy", value: "fantasy" },
+];
+
+// ✨ NEW: Font Sizes
+const FONT_SIZE_OPTIONS = [
+  { label: "Small", value: "12px" },
+  { label: "Normal", value: "16px" },
+  { label: "Medium", value: "20px" },
+  { label: "Large", value: "24px" },
+  { label: "X-Large", value: "32px" },
+  { label: "Huge", value: "48px" },
 ];
 
 const lightThemes: Record<ColorTheme, ThemeColors> = {
@@ -250,7 +262,7 @@ const darkThemes: Record<ColorTheme, ThemeColors> = {
   },
 };
 
-// ... [CopyButton, CodeBlock, extractTextContent helper functions remain exactly the same] ...
+// ... [CopyButton, CodeBlock, extractTextContent remain the same] ...
 function CopyButton({
   content,
   isDarkMode,
@@ -405,6 +417,8 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [colorTheme, setColorTheme] = useState<ColorTheme>("light");
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [isDragging, setIsDragging] = useState(false); // ✨ NEW: State for drag-drop
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -436,7 +450,6 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     }
   }, [debouncedContent, canvasId, isConnected, socket]);
 
-  // ✨ NEW: Helper to insert HTML tags for styling
   const insertHtmlTag = (prefix: string, suffix: string, blockMode: boolean = false) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -444,7 +457,6 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     const { selectionStart, selectionEnd } = textarea;
     const selectedText = content.substring(selectionStart, selectionEnd);
     
-    // For block mode elements (like divs), we often want newlines to ensure markdown parses correctly inside
     const pre = blockMode ? `\n\n${prefix}` : prefix;
     const suf = blockMode ? `${suffix}\n\n` : suffix;
 
@@ -459,7 +471,6 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
     setTimeout(() => {
       textarea.focus();
-      // If text was selected, keep selection wrapped. If not, place cursor inside tags.
       if (selectedText) {
         textarea.selectionStart = selectionStart;
         textarea.selectionEnd = selectionEnd + pre.length + suf.length;
@@ -470,6 +481,91 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     }, 0);
   };
 
+  // ✨ NEW: Drag and Drop Handlers
+  const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Necessary to allow dropping
+  };
+
+  const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    const file = files[0];
+    const textarea = textareaRef.current;
+    
+    // Determine insertion point (at cursor or end if not focused)
+    let insertPos = textarea ? textarea.selectionStart : content.length;
+    // If we dropped on preview, just append to end or try to be smart, 
+    // but usually drag-drop works best when dropping ON the textarea in edit mode.
+    // If not in edit mode, we switch to edit mode.
+    if (!isEditMode) setIsEditMode(true);
+
+    // Wait a tick for Edit Mode to render if it wasn't active
+    setTimeout(async () => {
+        const currentTextarea = textareaRef.current;
+        if (currentTextarea) {
+            insertPos = currentTextarea.selectionStart;
+        }
+
+        if (file.type.startsWith("image/")) {
+            // Handle Image Drop -> Convert to Base64
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64 = event.target?.result as string;
+                const imageMarkdown = `\n![${file.name}](${base64})\n`;
+                insertTextAtPosition(imageMarkdown, insertPos);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            // Handle Text/Code Drop -> Read content
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const text = event.target?.result as string;
+                const fileExtension = file.name.split('.').pop()?.toLowerCase();
+                let importedContent = text;
+                
+                // Wrap in code block if it's a code file
+                const codeExtensions = ['js', 'ts', 'py', 'java', 'c', 'cpp', 'json', 'html', 'css'];
+                if (codeExtensions.includes(fileExtension || '')) {
+                     importedContent = `\n\`\`\`${fileExtension}\n${text}\n\`\`\`\n`;
+                } else {
+                     importedContent = `\n${text}\n`;
+                }
+
+                insertTextAtPosition(importedContent, insertPos);
+            };
+            reader.readAsText(file);
+        }
+    }, 50);
+  };
+
+  const insertTextAtPosition = (text: string, position: number) => {
+      const before = content.substring(0, position);
+      const after = content.substring(position);
+      const newContent = before + text + after;
+      setContent(newContent);
+      isLocalChange.current = true;
+  };
+
+  // ... [handleKeyDown, handleInput, insertText, wrapSelection, getPlaceholderText, exportToPDF, handleImportFile, triggerFileImport remain the same] ...
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget;
     const { selectionStart, selectionEnd } = textarea;
@@ -722,8 +818,9 @@ Tab - Indent`;
         const color = computedStyle.color;
         const backgroundColor = computedStyle.backgroundColor;
         const borderColor = computedStyle.borderColor;
-        const textAlign = computedStyle.textAlign; // ✨ NEW: Capture alignment
-        const fontFamily = computedStyle.fontFamily; // ✨ NEW: Capture font
+        const textAlign = computedStyle.textAlign; 
+        const fontFamily = computedStyle.fontFamily;
+        const fontSize = computedStyle.fontSize; // ✨ NEW: Capture size
 
         if (color && color !== "rgba(0, 0, 0, 0)" && !color.includes("oklch")) {
           htmlElement.style.color = color;
@@ -742,12 +839,9 @@ Tab - Indent`;
         ) {
           htmlElement.style.borderColor = borderColor;
         }
-        if (textAlign) {
-            htmlElement.style.textAlign = textAlign;
-        }
-        if (fontFamily) {
-            htmlElement.style.fontFamily = fontFamily;
-        }
+        if (textAlign) htmlElement.style.textAlign = textAlign;
+        if (fontFamily) htmlElement.style.fontFamily = fontFamily;
+        if (fontSize) htmlElement.style.fontSize = fontSize;
       });
 
       const previewContent = clonedContent.innerHTML;
@@ -814,7 +908,7 @@ Tab - Indent`;
   };
 
   const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // ... [Same import logic as before]
+    // ... [Original Import Logic]
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -929,9 +1023,9 @@ Tab - Indent`;
       {content.trim() ? (
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeRaw]} // ✨ NEW: Allow parsing of HTML for style attributes
+          rehypePlugins={[rehypeRaw]}
           components={{
-            // ... [CodeBlock and other custom components remain the same] ...
+            // ... [CodeBlock and other custom components] ...
             code: (props) => (
               <CodeBlock
                 {...props}
@@ -1152,7 +1246,6 @@ Tab - Indent`;
                 </h3>
               );
             },
-            // ✨ NEW: Handlers for DIV and SPAN to ensure injected styles render correctly
             div(props) {
                 return <div {...props} className={cn("my-2", props.className)} />;
             },
@@ -1274,14 +1367,13 @@ Tab - Indent`;
     </div>
   );
 
-  // ✨ NEW: Formatting Toolbar Component
   const FormattingToolbar = () => (
     <div className={cn(
         "flex flex-wrap items-center gap-2 p-2 border-b",
         isDarkMode ? "border-slate-700 bg-slate-900/50" : "border-gray-200 bg-gray-50/50"
     )}>
         {/* Alignment Tools */}
-        <div className="flex items-center rounded-md border overflow-hidden">
+        <div className="flex items-center rounded-md border overflow-hidden shadow-sm">
             <Button
                 variant="ghost"
                 size="sm"
@@ -1326,8 +1418,8 @@ Tab - Indent`;
         <div className="flex items-center gap-1">
             <Type className={cn("h-4 w-4 mr-1", isDarkMode ? "text-gray-400" : "text-gray-500")} />
             <Select onValueChange={(value) => insertHtmlTag(`<span style="font-family: ${value}">`, '</span>')}>
-                <SelectTrigger className={cn("h-8 w-[120px] text-xs", isDarkMode ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-300 text-gray-900")}>
-                    <SelectValue placeholder="Font Family" />
+                <SelectTrigger className={cn("h-8 w-[120px] text-xs shadow-sm", isDarkMode ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-300 text-gray-900")}>
+                    <SelectValue placeholder="Font" />
                 </SelectTrigger>
                 <SelectContent>
                     {FONT_OPTIONS.map((font) => (
@@ -1339,10 +1431,28 @@ Tab - Indent`;
             </Select>
         </div>
 
+        {/* ✨ NEW: Font Size Selector */}
+        <div className="flex items-center gap-1">
+            <Scaling className={cn("h-4 w-4 mr-1", isDarkMode ? "text-gray-400" : "text-gray-500")} />
+            <Select onValueChange={(value) => insertHtmlTag(`<span style="font-size: ${value}">`, '</span>')}>
+                <SelectTrigger className={cn("h-8 w-[100px] text-xs shadow-sm", isDarkMode ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-300 text-gray-900")}>
+                    <SelectValue placeholder="Size" />
+                </SelectTrigger>
+                <SelectContent>
+                    {FONT_SIZE_OPTIONS.map((size) => (
+                        <SelectItem key={size.value} value={size.value}>
+                            {size.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+
         <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
 
-        {/* Color Picker (Wheel) */}
+        {/* Color Pickers */}
         <div className="flex items-center gap-2 group relative">
+             {/* Text Color */}
              <div className="relative">
                 <Button
                     variant="ghost"
@@ -1353,7 +1463,6 @@ Tab - Indent`;
                     )}
                     title="Text Color"
                     onClick={() => {
-                        // Trigger the hidden color input
                         const colorInput = document.getElementById("text-color-picker");
                         if (colorInput) colorInput.click();
                     }}
@@ -1361,12 +1470,37 @@ Tab - Indent`;
                     <Baseline className="h-4 w-4" />
                     <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-gradient-to-tr from-red-500 via-green-500 to-blue-500" />
                 </Button>
-                {/* Hidden Native Color Input */}
                 <input
                     type="color"
                     id="text-color-picker"
                     className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
                     onChange={(e) => insertHtmlTag(`<span style="color: ${e.target.value}">`, '</span>')}
+                />
+             </div>
+
+             {/* ✨ NEW: Highlight Color */}
+             <div className="relative">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                        "h-8 w-8 p-1 relative overflow-hidden",
+                        isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700"
+                    )}
+                    title="Highlight Text"
+                    onClick={() => {
+                        const bgInput = document.getElementById("bg-color-picker");
+                        if (bgInput) bgInput.click();
+                    }}
+                >
+                    <Highlighter className="h-4 w-4" />
+                    <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 border border-black/10" />
+                </Button>
+                <input
+                    type="color"
+                    id="bg-color-picker"
+                    className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
+                    onChange={(e) => insertHtmlTag(`<span style="background-color: ${e.target.value}">`, '</span>')}
                 />
              </div>
         </div>
@@ -1379,6 +1513,11 @@ Tab - Indent`;
         "h-full w-full relative",
         isDarkMode ? themeColors.bg : themeColors.bg
       )}
+      // ✨ NEW: Drag and drop event listeners on the main container
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <input
         ref={fileInputRef}
@@ -1387,6 +1526,17 @@ Tab - Indent`;
         onChange={handleImportFile}
         className="hidden"
       />
+
+      {/* ✨ NEW: Drag Overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-blue-500/20 backdrop-blur-sm border-4 border-dashed border-blue-500 m-4 rounded-xl flex items-center justify-center pointer-events-none">
+            <div className="bg-white/90 dark:bg-slate-800/90 p-8 rounded-xl shadow-xl flex flex-col items-center gap-4">
+                <FileUp className="h-16 w-16 text-blue-500 animate-bounce" />
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white">Drop files here</h3>
+                <p className="text-slate-500 dark:text-slate-300">Import text, code, or images</p>
+            </div>
+        </div>
+      )}
 
       <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
         <div className="relative">
@@ -1458,7 +1608,6 @@ Tab - Indent`;
       >
         {isEditMode ? (
           <div className="relative h-full flex flex-col">
-            {/* ✨ NEW: Render Formatting Toolbar only in Edit Mode */}
             <FormattingToolbar />
             
             <div className="relative flex-grow">
