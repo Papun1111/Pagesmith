@@ -7,6 +7,7 @@ import { logger } from '../utils/logger.js';
 // --- NEW: Define the list of emails that should bypass rate limiting ---
 const specialAccessEmails = [
   'gohanmohapatra@gmail.com',
+  'dipunmohapatra.69@gmail.com'
 ];
 
 const PLAN_LIMITS = {
