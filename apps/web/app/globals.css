@@ -6,6 +6,7 @@
   font-family: "Germania One", system-ui;
   font-weight: 900;
   font-style: normal;
+  scroll-behavior: smooth;
 }
 @theme inline {
   --color-background: var(--background);
