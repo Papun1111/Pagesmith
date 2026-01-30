@@ -2,8 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-// FIX: Import the `useUser` hook to get user details.
-import {  useUser } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Check, LoaderCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import { type PricingTier } from '@/types';
 import { toast } from 'sonner';
 
 // This informs TypeScript that the Razorpay object will be available globally
-// because we included their script in the main layout.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const Razorpay: any;
 
 interface PricingCardProps {
@@ -21,12 +20,11 @@ interface PricingCardProps {
 
 /**
  * A UI component to display a single subscription plan/pricing tier,
- * now fully integrated with the Razorpay payment flow.
+ * styled with a Neo-Brutalist aesthetic.
  */
 export function PricingCard({ tier }: PricingCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // FIX: Use the `useUser` hook to get the user object for pre-filling details.
   const { user } = useUser();
   const router = useRouter();
 
@@ -81,6 +79,7 @@ export function PricingCard({ tier }: PricingCardProps) {
 
           } catch (verifyError: any) {
              setError(verifyError.message);
+             toast.error(verifyError.message);
           }
         },
         prefill: {
@@ -88,7 +87,7 @@ export function PricingCard({ tier }: PricingCardProps) {
           email: user?.primaryEmailAddress?.emailAddress || '',
         },
         theme: {
-          color: "#14213d",
+          color: "#000000",
         },
       };
 
@@ -112,61 +111,77 @@ export function PricingCard({ tier }: PricingCardProps) {
   const isActionable = tier.id !== 'free';
 
   return (
-    <div className={cn(
-        "border border-black p-6 flex flex-col relative h-full dark:border-slate-700",
-        tier.isMostPopular 
-            ? "bg-black text-white dark:bg-slate-800 dark:text-white" 
-            : "bg-[#F0F0F0] text-black dark:bg-slate-900 dark:text-white"
-    )}>
+    <div 
+      className={cn(
+        "relative flex flex-col h-full p-8 transition-all duration-200",
+        "border-2 border-black dark:border-white bg-white dark:bg-[#111111]",
+        "shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)]",
+        "hover:-translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]",
+        tier.isMostPopular && "ring-2 ring-offset-4 ring-black dark:ring-white dark:ring-offset-[#111111]"
+      )}
+      style={{ fontFamily: "'Poppins', sans-serif" }}
+    >
         {tier.isMostPopular && (
-            <div className="absolute top-0 -translate-y-1/2 left-1/2 -translate-x-1/2 bg-[#FF4136] text-white px-3 py-1 text-xs font-bold uppercase tracking-wider">
+            <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-[#FF4136] text-white px-4 py-1.5 text-xs font-black uppercase tracking-widest border-2 border-black dark:border-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] whitespace-nowrap z-10">
                 Most Popular
             </div>
         )}
         
-        <h3 className="text-2xl font-black">{tier.name}</h3>
-        <p className={cn("mt-2 text-sm min-h-[40px]", tier.isMostPopular ? "text-white/80" : "text-black/70 dark:text-slate-400")}>{tier.description}</p>
-        
-        <div className="mt-6">
-            <span className="text-4xl font-black">${tier.priceMonthly}</span>
-            <span className={cn("text-md", tier.isMostPopular ? "text-white/70" : "text-black/60 dark:text-slate-400")}>/month</span>
+        <div className="mb-6">
+            <h3 className="text-3xl font-black uppercase tracking-tighter text-black dark:text-white mb-2">{tier.name}</h3>
+            <p className="text-sm font-medium text-black/60 dark:text-white/60 leading-relaxed min-h-[40px]">{tier.description}</p>
         </div>
         
-        <ul className="mt-6 space-y-3 flex-grow">
+        <div className="mb-8 flex items-baseline">
+            <span className="text-5xl font-black text-black dark:text-white">${tier.priceMonthly}</span>
+            <span className="text-lg font-bold text-black/40 dark:text-white/40 ml-2">/mo</span>
+        </div>
+        
+        <ul className="space-y-4 flex-grow mb-8">
             {tier.features.map((feature) => (
-                <li key={feature} className="flex items-center gap-3 text-sm">
-                    <Check className="h-5 w-5 flex-shrink-0" />
-                    <span>{feature}</span>
+                <li key={feature} className="flex items-start gap-3">
+                    <div className="mt-0.5 p-0.5 bg-black dark:bg-white text-white dark:text-black rounded-none flex-shrink-0">
+                        <Check className="h-3 w-3 stroke-[4]" />
+                    </div>
+                    <span className="text-sm font-bold text-black/80 dark:text-white/80">{feature}</span>
                 </li>
             ))}
         </ul>
 
-        <div className="mt-8">
+        <div className="mt-auto">
             {isActionable && (
                 <Button
                     className={cn(
-                        "w-full rounded-none font-bold py-5 text-base transition-colors",
+                        "w-full h-14 rounded-none font-black text-base uppercase tracking-widest transition-all",
                         tier.isCurrentPlan
-                            ? "bg-transparent border-2 border-black text-black cursor-not-allowed dark:border-slate-600 dark:text-slate-400"
-                            : tier.isMostPopular
-                            ? "bg-white text-black hover:bg-white/90"
-                            : "bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+                            ? "bg-gray-200 text-gray-400 border-2 border-gray-300 cursor-not-allowed dark:bg-neutral-800 dark:text-neutral-500 dark:border-neutral-700"
+                            : "bg-black text-white border-2 border-black hover:bg-white hover:text-black dark:bg-white dark:text-black dark:border-white dark:hover:bg-black dark:hover:text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] active:shadow-none active:translate-x-[4px] active:translate-y-[4px]"
                     )}
                     onClick={handleCheckout}
                     disabled={isLoading || tier.isCurrentPlan}
                 >
-                    {isLoading && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}
-                    {tier.isCurrentPlan ? 'Your Current Plan' : 'Get Started'}
+                    {isLoading && <LoaderCircle className="mr-3 h-5 w-5 animate-spin" />}
+                    {tier.isCurrentPlan ? 'Current Plan' : 'Get Started'}
                 </Button>
             )}
+            
+            {/* Free plan button (disabled visual state) */}
+            {!isActionable && (
+                 <Button
+                    className="w-full h-14 rounded-none font-black text-base uppercase tracking-widest bg-gray-100 text-gray-500 border-2 border-gray-200 cursor-default dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800"
+                    disabled
+                >
+                    Free Forever
+                </Button>
+            )}
+
             {error && (
-                <div className="mt-2 text-xs text-red-600 flex items-center gap-1.5">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span>{error}</span>
+                <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-500/50 flex items-start gap-2 text-red-700 dark:text-red-300">
+                    <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                    <span className="text-xs font-bold uppercase">{error}</span>
                 </div>
             )}
         </div>
     </div>
   );
 }
-

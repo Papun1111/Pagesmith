@@ -13,6 +13,7 @@ import {
   FileText,
   AlertTriangle,
   ArrowUpRight,
+  Users,
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -35,25 +36,24 @@ const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
         className="no-underline text-inherit"
         passHref
       >
-        {/* --- STYLE CHANGE --- */}
         <motion.div
-          className="border border-black p-4 h-48 flex flex-col justify-between group cursor-pointer hover:bg-black hover:text-white transition-colors dark:border-neutral-700 dark:hover:bg-white dark:hover:text-black"
+          className="border-2 border-black dark:border-white p-6 h-48 flex flex-col justify-between group cursor-pointer bg-white dark:bg-[#1a1a1a] hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[2px_2px_0px_0px_rgba(255,255,255,1)]"
           variants={{
             hidden: { opacity: 0, y: 20 },
             visible: { opacity: 1, y: 0 },
           }}
         >
           <div>
-            <h3 className="font-black text-lg sm:text-xl truncate flex items-start gap-2">
+            <h3 className="font-black text-lg sm:text-xl truncate flex items-start gap-2 uppercase tracking-tight">
               <FileText className="h-5 w-5 mt-1 flex-shrink-0" />
               <span className="truncate">{canvas.title}</span>
             </h3>
           </div>
-          <div className="flex justify-between items-end">
-            <p className="text-sm opacity-70">
+          <div className="flex justify-between items-end border-t-2 border-black/10 dark:border-white/20 pt-4 group-hover:border-white/20 dark:group-hover:border-black/20">
+            <p className="text-xs font-bold opacity-70 uppercase tracking-wider">
               Updated: {new Date(canvas.updatedAt).toLocaleDateString()}
             </p>
-            <ArrowUpRight className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <ArrowUpRight className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </motion.div>
       </Link>
@@ -62,15 +62,14 @@ const CanvasGrid = ({ canvases }: { canvases: Canvas[] }) => (
 );
 
 const DashboardSkeleton = () => (
-  <div className="md:ml-16 pt-16 p-4 md:p-8 space-y-12">
+  <div className="md:ml-16 pt-24 p-4 md:p-8 space-y-12 bg-[#F0F0F0] dark:bg-[#111111]">
     <div className="flex items-center justify-between">
-      {/* --- STYLE CHANGE --- */}
-      <Skeleton className="h-10 w-48 sm:w-64 bg-gray-300 dark:bg-neutral-800" />
-      <Skeleton className="h-12 w-12 sm:w-48 bg-gray-300 dark:bg-neutral-800" />
+      <Skeleton className="h-12 w-48 sm:w-64 bg-gray-300 dark:bg-neutral-800 rounded-none" />
+      <Skeleton className="h-14 w-14 sm:w-48 bg-gray-300 dark:bg-neutral-800 rounded-none" />
     </div>
     <div className="space-y-12">
       <div>
-        <Skeleton className="h-8 w-48 mb-4 bg-gray-300 dark:bg-neutral-800" />
+        <Skeleton className="h-10 w-48 mb-6 bg-gray-300 dark:bg-neutral-800 rounded-none" />
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Skeleton
@@ -81,7 +80,7 @@ const DashboardSkeleton = () => (
         </div>
       </div>
       <div>
-        <Skeleton className="h-8 w-64 mb-4 bg-gray-300 dark:bg-neutral-800" />
+        <Skeleton className="h-10 w-64 mb-6 bg-gray-300 dark:bg-neutral-800 rounded-none" />
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(2)].map((_, i) => (
             <Skeleton
@@ -155,15 +154,13 @@ export default function DashboardPage() {
 
   if (!isLoaded || isLoading) {
     return (
-      // --- STYLE CHANGE ---
       <main
         style={{ fontFamily: "'Poppins', sans-serif" }}
-        className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen dark:bg-[#1a1a1a] dark:text-white"
+        className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen dark:bg-[#111111] dark:text-white"
       >
-        {/* --- STYLE CHANGE --- */}
-        <div className="fixed top-0 left-0 z-40 h-full w-16 hidden md:flex items-center justify-center border-r border-black bg-[#F0F0F0] dark:bg-[#1a1a1a] dark:border-neutral-800">
-          <span className="font-black text-xl [writing-mode:vertical-rl] tracking-widest uppercase">
-            Dashboard
+        <div className="fixed top-0 left-0 z-40 h-full w-16 hidden md:flex items-center justify-center border-r-2 border-black dark:border-white bg-[#F0F0F0] dark:bg-[#111111]">
+          <span className="font-black text-xl [writing-mode:vertical-rl] tracking-widest uppercase text-black dark:text-white whitespace-nowrap">
+            DASHBOARD • WORKSPACE
           </span>
         </div>
         <DashboardSkeleton />
@@ -172,68 +169,65 @@ export default function DashboardPage() {
   }
 
   return (
-    // --- STYLE CHANGE ---
     <main
       style={{ fontFamily: "'Poppins', sans-serif" }}
-      className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen dark:bg-[#1a1a1a] dark:text-white"
+      className="w-full bg-[#F0F0F0] text-[#111111] min-h-screen dark:bg-[#111111] dark:text-white transition-colors duration-300"
     >
-      <div className="md:ml-16 pt-16 p-4 md:p-8 space-y-12">
+      <div className="md:ml-16 pt-24 p-6 md:p-12 space-y-16">
         {error && (
-          // --- STYLE CHANGE ---
-          <div className="flex items-center gap-4 border border-red-500 bg-red-100 p-4 text-red-700 font-bold dark:bg-red-900/20 dark:border-red-500/50 dark:text-red-300">
-            <AlertTriangle className="h-6 w-6" />
+          <div className="flex items-center gap-4 border-2 border-red-600 bg-red-100 p-6 text-red-700 font-black uppercase tracking-wide shadow-[4px_4px_0px_0px_rgba(220,38,38,1)]">
+            <AlertTriangle className="h-8 w-8" />
             <p>{error}</p>
           </div>
         )}
 
         <section>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-3xl md:text-4xl font-black flex items-center gap-3">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter flex items-center gap-4">
+              <div className="bg-black dark:bg-white text-white dark:text-black p-2">
+                 <FileText className="h-8 w-8" />
+              </div>
               My Canvases
             </h2>
-            {/* --- STYLE CHANGE --- */}
             <Button
               onClick={handleCreateNewCanvas}
               disabled={isCreating}
-              className="bg-black text-white rounded-none hover:bg-black/80 px-3 sm:px-6 py-3 sm:py-6 font-bold flex items-center dark:bg-white dark:text-black dark:hover:bg-white/90"
+              className="bg-black text-white rounded-none hover:bg-white hover:text-black border-2 border-black dark:bg-white dark:text-black dark:hover:bg-black dark:hover:text-white dark:border-white px-8 py-6 font-black uppercase tracking-wide text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] transition-all"
             >
-              <PlusCircle className="h-5 w-5 sm:mr-2" />
-              <span className="hidden sm:inline">
-                {isCreating ? "Creating..." : "Create Canvas"}
-              </span>
+              <PlusCircle className="h-6 w-6 mr-2" />
+              {isCreating ? "Creating..." : "New Canvas"}
             </Button>
           </div>
+          
           {ownedCanvases.length > 0 ? (
             <CanvasGrid canvases={ownedCanvases} />
           ) : (
-            // --- STYLE CHANGE ---
-            <div className="text-center py-16 border-2 border-dashed border-black dark:border-neutral-700">
-              <h3 className="text-xl md:text-2xl font-black">
-                NO CANVASES... YET.
-              </h3>
-              {/* --- STYLE CHANGE --- */}
-              <p className="text-black/70 mt-2 dark:text-white/70">
-                Click &quot;Create Canvas&quot; to start a new project.
+            <div className="text-center py-24 border-2 border-dashed border-black dark:border-white bg-white/50 dark:bg-white/5">
+              <h3 className="text-2xl md:text-4xl font-black uppercase tracking-tight mb-2">NO CANVASES... YET.</h3>
+              <p className="text-black/60 dark:text-white/60 font-medium">
+                Click &quot;New Canvas&quot; to start your next big idea.
               </p>
             </div>
           )}
         </section>
 
         <section>
-          <h2 className="text-3xl md:text-4xl font-black mb-4 flex items-center gap-3">
-            Shared With Me
-          </h2>
+          <div className="flex items-center gap-4 mb-8">
+            <div className="bg-black dark:bg-white text-white dark:text-black p-2">
+                 <Users className="h-8 w-8" />
+            </div>
+            <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter">
+              Shared With Me
+            </h2>
+          </div>
+          
           {sharedCanvases.length > 0 ? (
             <CanvasGrid canvases={sharedCanvases} />
           ) : (
-            // --- STYLE CHANGE ---
-            <div className="text-center py-16 border-2 border-dashed border-black dark:border-neutral-700">
-              <h3 className="text-xl md:text-2xl font-black">
-                NOTHING TO SEE HERE.
-              </h3>
-               {/* --- STYLE CHANGE --- */}
-              <p className="text-black/70 mt-2 dark:text-white/70">
-                When someone shares a canvas, it will appear here.
+            <div className="text-center py-24 border-2 border-dashed border-black dark:border-white bg-white/50 dark:bg-white/5">
+              <h3 className="text-2xl md:text-4xl font-black uppercase tracking-tight mb-2">NOTHING TO SEE HERE.</h3>
+              <p className="text-black/60 dark:text-white/60 font-medium">
+                When someone shares a canvas with you, it will appear here.
               </p>
             </div>
           )}
@@ -242,4 +236,3 @@ export default function DashboardPage() {
     </main>
   );
 }
-
