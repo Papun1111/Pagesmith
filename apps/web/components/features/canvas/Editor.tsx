@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, ReactNode, DragEvent } from "react";
+import { useState, useEffect, useRef, ReactNode, DragEvent, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -27,14 +27,27 @@ import {
   Baseline,
   Highlighter,
   FileUp,
-  Scaling,
   Sigma,
+  Terminal,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListTodo,
+  Quote,
+  Code2,
+  Table as TableIcon,
+  Image as ImageIcon,
+  FileJson,
+  FileCode,
+  Braces,
+  Coffee,
+  FileType,
 } from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -44,6 +57,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ------------------------------------------------------------------
 // 1. Interfaces & Types
@@ -64,217 +83,197 @@ interface CodeBlockProps {
 type ColorTheme = "light" | "nord" | "slate" | "ocean";
 
 interface ThemeColors {
-  bg: string;
+  appBg: string;
   text: string;
+  mutedText: string;
+  border: string;
+  highlight: string;
   codeBlockBg: string;
-  codeBg: string;
-  codeBorder: string;
-  codeText: string;
-  blockquoteBg: string;
-  blockquoteBorder: string;
-  blockquoteText: string;
-  linkColor: string;
-  linkHover: string;
-  tableBg: string;
-  tableBorder: string;
-  tableHeaderBg: string;
-  tableHeaderText: string;
-  tableText: string;
-  cardBg: string;
-  cardBorder: string;
+  proseClass: string;
+  menuBg: string;
+  menuHover: string;
+}
+
+interface CommandItem {
+    label: string;
+    description: string;
+    value: string;
+    offset: number;
+    icon: React.ElementType;
+    shortcut?: string; // Added for explicit searching like /js
 }
 
 // ------------------------------------------------------------------
-// 2. Constants (Defined BEFORE Usage)
+// 2. Constants
 // ------------------------------------------------------------------
+
+// Expanded Slash Commands to include language-specific snippets
+const SLASH_COMMANDS: CommandItem[] = [
+    // --- Basic Formatting ---
+    { label: "Heading 1", description: "Big section heading", value: "# ", offset: 2, icon: Heading1 },
+    { label: "Heading 2", description: "Medium section heading", value: "## ", offset: 3, icon: Heading2 },
+    { label: "Heading 3", description: "Small section heading", value: "### ", offset: 4, icon: Heading3 },
+    { label: "Bullet List", description: "Create a simple list", value: "- ", offset: 2, icon: List },
+    { label: "To-do List", description: "Track tasks", value: "- [ ] ", offset: 6, icon: ListTodo },
+    { label: "Quote", description: "Capture a quote", value: "> ", offset: 2, icon: Quote },
+    { label: "Table", description: "Insert a table", value: "| Header | Header |\n| --- | --- |\n| Cell | Cell |", offset: 12, icon: TableIcon },
+    { label: "Math", description: "KaTeX Equation", value: "$$\n\n$$", offset: 3, icon: Sigma },
+    { label: "Image", description: "Insert image link", value: "![Alt text](url)", offset: 11, icon: ImageIcon },
+
+    // --- Code Snippets ---
+    { label: "Code Block", description: "Generic code snippet", value: "```\n\n```", offset: 4, icon: Code2, shortcut: "code" },
+    { label: "JavaScript", description: "JS code block", value: "```javascript\n\n```", offset: 14, icon: FileCode, shortcut: "js" },
+    { label: "TypeScript", description: "TS code block", value: "```typescript\n\n```", offset: 14, icon: FileCode, shortcut: "ts" },
+    { label: "Python", description: "Python code block", value: "```python\n\n```", offset: 10, icon: FileType, shortcut: "py" },
+    { label: "Java", description: "Java code block", value: "```java\n\n```", offset: 8, icon: Coffee, shortcut: "java" },
+    { label: "React / TSX", description: "React component", value: "```tsx\n\n```", offset: 7, icon: Braces, shortcut: "tsx" },
+    { label: "HTML", description: "HTML structure", value: "```html\n\n```", offset: 8, icon: Code2, shortcut: "html" },
+    { label: "CSS", description: "CSS styles", value: "```css\n\n```", offset: 7, icon: Code2, shortcut: "css" },
+    { label: "JSON", description: "JSON data", value: "```json\n\n```", offset: 8, icon: FileJson, shortcut: "json" },
+    { label: "Markdown", description: "Markdown example", value: "```markdown\n\n```", offset: 12, icon: FileType, shortcut: "md" },
+];
 
 const FONT_OPTIONS = [
   { label: "Default", value: "inherit" },
-  { label: "Sans Serif", value: "sans-serif" },
-  { label: "Serif", value: "serif" },
-  { label: "Monospace", value: "monospace" },
-  { label: "Cursive", value: "cursive" },
-  { label: "Fantasy", value: "fantasy" },
+  { label: "Sans Serif", value: "Inter, sans-serif" },
+  { label: "Serif", value: "Merriweather, serif" },
+  { label: "Monospace", value: "'JetBrains Mono', monospace" },
 ];
 
 const FONT_SIZE_OPTIONS = [
-  { label: "Small", value: "12px" },
+  { label: "Small", value: "14px" },
   { label: "Normal", value: "16px" },
-  { label: "Medium", value: "20px" },
+  { label: "Medium", value: "18px" },
   { label: "Large", value: "24px" },
-  { label: "X-Large", value: "32px" },
-  { label: "Huge", value: "48px" },
 ];
 
 const lightThemes: Record<ColorTheme, ThemeColors> = {
   light: {
-    bg: "bg-indigo-100",
-    text: "text-indigo-950",
-    codeBlockBg: "#f8f5ff",
-    codeBg: "bg-indigo-200",
-    codeBorder: "border-indigo-300",
-    codeText: "text-indigo-900",
-    blockquoteBg: "bg-indigo-200",
-    blockquoteBorder: "border-indigo-500",
-    blockquoteText: "text-indigo-800",
-    linkColor: "text-indigo-600",
-    linkHover: "hover:text-indigo-700",
-    tableBg: "bg-indigo-50",
-    tableBorder: "border-indigo-300",
-    tableHeaderBg: "bg-indigo-200",
-    tableHeaderText: "text-indigo-900",
-    tableText: "text-indigo-900",
-    cardBg: "bg-indigo-50",
-    cardBorder: "border-indigo-200",
+    appBg: "bg-white",
+    text: "text-slate-900",
+    mutedText: "text-slate-400",
+    border: "border-gray-200",
+    highlight: "bg-indigo-50 text-indigo-700",
+    codeBlockBg: "#f8fafc",
+    proseClass: "prose-slate",
+    menuBg: "bg-white",
+    menuHover: "bg-slate-100",
   },
   nord: {
-    bg: "bg-slate-200",
-    text: "text-slate-900",
-    codeBlockBg: "#eceff4",
-    codeBg: "bg-slate-300",
-    codeBorder: "border-slate-400",
-    codeText: "text-slate-900",
-    blockquoteBg: "bg-slate-300",
-    blockquoteBorder: "border-slate-600",
-    blockquoteText: "text-slate-800",
-    linkColor: "text-cyan-700",
-    linkHover: "hover:text-cyan-800",
-    tableBg: "bg-slate-100",
-    tableBorder: "border-slate-400",
-    tableHeaderBg: "bg-slate-300",
-    tableHeaderText: "text-slate-900",
-    tableText: "text-slate-900",
-    cardBg: "bg-slate-100",
-    cardBorder: "border-slate-300",
+    appBg: "bg-[#ECEFF4]",
+    text: "text-[#2E3440]",
+    mutedText: "text-[#4C566A]",
+    border: "border-[#D8DEE9]",
+    highlight: "bg-[#88C0D0]/10 text-[#5E81AC]",
+    codeBlockBg: "#E5E9F0",
+    proseClass: "prose-slate",
+    menuBg: "bg-[#E5E9F0]",
+    menuHover: "bg-[#D8DEE9]",
   },
   slate: {
-    bg: "bg-emerald-100",
-    text: "text-emerald-950",
-    codeBlockBg: "#f0fdf4",
-    codeBg: "bg-emerald-200",
-    codeBorder: "border-emerald-300",
-    codeText: "text-emerald-900",
-    blockquoteBg: "bg-emerald-200",
-    blockquoteBorder: "border-emerald-600",
-    blockquoteText: "text-emerald-800",
-    linkColor: "text-teal-600",
-    linkHover: "hover:text-teal-700",
-    tableBg: "bg-emerald-50",
-    tableBorder: "border-emerald-300",
-    tableHeaderBg: "bg-emerald-200",
-    tableHeaderText: "text-emerald-900",
-    tableText: "text-emerald-900",
-    cardBg: "bg-emerald-50",
-    cardBorder: "border-emerald-200",
+    appBg: "bg-[#fdfbf7]",
+    text: "text-stone-800",
+    mutedText: "text-stone-400",
+    border: "border-stone-200",
+    highlight: "bg-stone-200/50 text-stone-900",
+    codeBlockBg: "#f5f5f4",
+    proseClass: "prose-stone",
+    menuBg: "bg-[#fdfbf7]",
+    menuHover: "bg-stone-100",
   },
   ocean: {
-    bg: "bg-cyan-100",
-    text: "text-cyan-950",
-    codeBlockBg: "#ecf8ff",
-    codeBg: "bg-cyan-200",
-    codeBorder: "border-cyan-300",
-    codeText: "text-cyan-900",
-    blockquoteBg: "bg-cyan-200",
-    blockquoteBorder: "border-blue-600",
-    blockquoteText: "text-cyan-800",
-    linkColor: "text-blue-600",
-    linkHover: "hover:text-blue-700",
-    tableBg: "bg-cyan-50",
-    tableBorder: "border-cyan-300",
-    tableHeaderBg: "bg-cyan-200",
-    tableHeaderText: "text-cyan-900",
-    tableText: "text-cyan-900",
-    cardBg: "bg-cyan-50",
-    cardBorder: "border-cyan-200",
+    appBg: "bg-blue-50/30",
+    text: "text-slate-900",
+    mutedText: "text-slate-400",
+    border: "border-blue-100",
+    highlight: "bg-blue-100 text-blue-700",
+    codeBlockBg: "#f0f9ff",
+    proseClass: "prose-blue",
+    menuBg: "bg-white",
+    menuHover: "bg-blue-50",
   },
 };
 
 const darkThemes: Record<ColorTheme, ThemeColors> = {
   light: {
-    bg: "bg-indigo-950",
-    text: "text-indigo-100",
-    codeBlockBg: "#1e1b4b",
-    codeBg: "bg-indigo-900",
-    codeBorder: "border-indigo-700",
-    codeText: "text-indigo-200",
-    blockquoteBg: "bg-indigo-900",
-    blockquoteBorder: "border-indigo-500",
-    blockquoteText: "text-indigo-200",
-    linkColor: "text-indigo-400",
-    linkHover: "hover:text-indigo-300",
-    tableBg: "bg-indigo-900",
-    tableBorder: "border-indigo-700",
-    tableHeaderBg: "bg-indigo-800",
-    tableHeaderText: "text-indigo-100",
-    tableText: "text-indigo-100",
-    cardBg: "bg-indigo-900",
-    cardBorder: "border-indigo-800",
+    appBg: "bg-zinc-950",
+    text: "text-zinc-100",
+    mutedText: "text-zinc-500",
+    border: "border-zinc-800",
+    highlight: "bg-indigo-500/20 text-indigo-300",
+    codeBlockBg: "#18181b",
+    proseClass: "prose-invert",
+    menuBg: "bg-zinc-900",
+    menuHover: "bg-zinc-800",
   },
   nord: {
-    bg: "bg-slate-900",
-    text: "text-slate-100",
-    codeBlockBg: "#1e293b",
-    codeBg: "bg-slate-800",
-    codeBorder: "border-slate-600",
-    codeText: "text-slate-200",
-    blockquoteBg: "bg-slate-800",
-    blockquoteBorder: "border-slate-500",
-    blockquoteText: "text-slate-200",
-    linkColor: "text-cyan-400",
-    linkHover: "hover:text-cyan-300",
-    tableBg: "bg-slate-800",
-    tableBorder: "border-slate-600",
-    tableHeaderBg: "bg-slate-700",
-    tableHeaderText: "text-slate-100",
-    tableText: "text-slate-100",
-    cardBg: "bg-slate-800",
-    cardBorder: "border-slate-700",
+    appBg: "bg-[#2E3440]",
+    text: "text-[#ECEFF4]",
+    mutedText: "text-[#D8DEE9]",
+    border: "border-[#434C5E]",
+    highlight: "bg-[#88C0D0]/20 text-[#88C0D0]",
+    codeBlockBg: "#242933",
+    proseClass: "prose-invert",
+    menuBg: "bg-[#2E3440]",
+    menuHover: "bg-[#3B4252]",
   },
   slate: {
-    bg: "bg-emerald-950",
-    text: "text-emerald-100",
-    codeBlockBg: "#022c22",
-    codeBg: "bg-emerald-900",
-    codeBorder: "border-emerald-700",
-    codeText: "text-emerald-200",
-    blockquoteBg: "bg-emerald-900",
-    blockquoteBorder: "border-emerald-600",
-    blockquoteText: "text-emerald-200",
-    linkColor: "text-teal-400",
-    linkHover: "hover:text-teal-300",
-    tableBg: "bg-emerald-900",
-    tableBorder: "border-emerald-700",
-    tableHeaderBg: "bg-emerald-800",
-    tableHeaderText: "text-emerald-100",
-    tableText: "text-emerald-100",
-    cardBg: "bg-emerald-900",
-    cardBorder: "border-emerald-800",
+    appBg: "bg-[#1c1917]",
+    text: "text-[#e7e5e4]",
+    mutedText: "text-[#78716c]",
+    border: "border-[#292524]",
+    highlight: "bg-[#44403c] text-[#fafaf9]",
+    codeBlockBg: "#0c0a09",
+    proseClass: "prose-invert",
+    menuBg: "bg-[#1c1917]",
+    menuHover: "bg-[#292524]",
   },
   ocean: {
-    bg: "bg-cyan-950",
-    text: "text-cyan-100",
-    codeBlockBg: "#083344",
-    codeBg: "bg-cyan-900",
-    codeBorder: "border-cyan-700",
-    codeText: "text-cyan-200",
-    blockquoteBg: "bg-cyan-900",
-    blockquoteBorder: "border-blue-500",
-    blockquoteText: "text-cyan-200",
-    linkColor: "text-blue-400",
-    linkHover: "hover:text-blue-300",
-    tableBg: "bg-cyan-900",
-    tableBorder: "border-cyan-700",
-    tableHeaderBg: "bg-cyan-800",
-    tableHeaderText: "text-cyan-100",
-    tableText: "text-cyan-100",
-    cardBg: "bg-cyan-900",
-    cardBorder: "border-cyan-800",
+    appBg: "bg-[#0f172a]",
+    text: "text-[#f1f5f9]",
+    mutedText: "text-[#94a3b8]",
+    border: "border-[#334155]",
+    highlight: "bg-[#38bdf8]/20 text-[#38bdf8]",
+    codeBlockBg: "#020617",
+    proseClass: "prose-invert",
+    menuBg: "bg-[#0f172a]",
+    menuHover: "bg-[#1e293b]",
   },
 };
 
 // ------------------------------------------------------------------
-// 3. Helper Functions & Components (Defined AFTER constants)
+// 3. Helper Functions & Components
 // ------------------------------------------------------------------
+
+function getCaretCoordinates(element: HTMLTextAreaElement, position: number) {
+    const div = document.createElement('div');
+    const style = window.getComputedStyle(element);
+
+    Array.from(style).forEach((prop) => {
+        div.style.setProperty(prop, style.getPropertyValue(prop));
+    });
+
+    div.style.position = 'absolute';
+    div.style.visibility = 'hidden';
+    div.style.whiteSpace = 'pre-wrap';
+    div.style.wordWrap = 'break-word';
+    div.style.overflow = 'hidden';
+    div.textContent = element.value.substring(0, position);
+
+    const span = document.createElement('span');
+    span.textContent = '|';
+    div.appendChild(span);
+
+    document.body.appendChild(div);
+    const { offsetLeft, offsetTop } = span;
+    document.body.removeChild(div);
+
+    const rect = element.getBoundingClientRect();
+    return {
+        left: rect.left + offsetLeft - element.scrollLeft,
+        top: rect.top + offsetTop - element.scrollTop
+    };
+}
 
 function extractTextContent(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") {
@@ -293,7 +292,6 @@ function extractTextContent(node: ReactNode): string {
 function CopyButton({
   content,
   isDarkMode,
-  theme,
 }: {
   content: string;
   language?: string;
@@ -301,7 +299,6 @@ function CopyButton({
   theme: ColorTheme;
 }) {
   const [copied, setCopied] = useState(false);
-  const themeColors = isDarkMode ? darkThemes[theme] : lightThemes[theme];
 
   const handleCopy = async () => {
     try {
@@ -318,27 +315,17 @@ function CopyButton({
       variant="ghost"
       size="sm"
       className={cn(
-        "absolute top-2 right-2 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity border",
+        "absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200",
         isDarkMode
-          ? "bg-slate-800 hover:bg-slate-700 border-slate-700"
-          : "bg-white/50 hover:bg-white/80 border-slate-300"
+          ? "bg-white/10 hover:bg-white/20 text-gray-300"
+          : "bg-black/5 hover:bg-black/10 text-gray-600"
       )}
       onClick={handleCopy}
     >
       {copied ? (
-        <Check
-          className={cn(
-            "h-3 w-3",
-            isDarkMode ? "text-green-400" : "text-green-600"
-          )}
-        />
+        <Check className="h-3.5 w-3.5 text-green-500" />
       ) : (
-        <Copy
-          className={cn(
-            "h-3 w-3",
-            isDarkMode ? "text-white" : themeColors.codeText
-          )}
-        />
+        <Copy className="h-3.5 w-3.5" /> 
       )}
     </Button>
   );
@@ -354,22 +341,19 @@ function CodeBlock({
   const match = /language-(\w+)/.exec(className || "");
   const language = match ? match[1] : "";
   const isInline = !match;
-  const content = String(children || "").replace(/\n$/, "");
-  const themeColors = isDarkMode ? darkThemes[theme] : lightThemes[theme];
+  
+  const content = extractTextContent(children).replace(/\n$/, "");
+  const colors = isDarkMode ? darkThemes[theme] : lightThemes[theme];
 
   if (isInline) {
     return (
       <code
         {...rest}
         className={cn(
-          "px-2 py-1 rounded font-mono text-sm border",
+          "px-1.5 py-0.5 rounded-md font-mono text-[0.9em] border font-medium",
           isDarkMode
-            ? "bg-slate-800 text-white border-slate-600"
-            : cn(
-                themeColors.codeBg,
-                themeColors.codeText,
-                themeColors.codeBorder
-              )
+            ? "bg-white/10 border-white/10 text-pink-300"
+            : "bg-slate-100 border-slate-200 text-pink-600"
         )}
       >
         {children}
@@ -378,20 +362,17 @@ function CodeBlock({
   }
 
   return (
-    <div className="relative group my-4">
-      {language && (
-        <div
-          className={cn(
-            "absolute top-2 left-4 text-xs px-2 py-1 rounded-md z-10",
-            isDarkMode
-              ? "text-gray-300 bg-gray-700"
-              : cn(themeColors.codeBg, themeColors.codeText)
-          )}
-        >
-          {language}
+    <div className="relative group my-6 rounded-lg overflow-hidden border border-transparent shadow-sm">
+      <div className={cn(
+        "flex items-center justify-between px-4 py-2 text-xs font-mono border-b select-none",
+         isDarkMode ? "bg-[#1e1e1e] border-white/10 text-gray-400" : "bg-gray-100 border-gray-200 text-gray-500"
+      )}>
+        <div className="flex items-center gap-2">
+            <Terminal className="w-3 h-3" />
+            <span className="uppercase tracking-wider">{language || "text"}</span>
         </div>
-      )}
-
+      </div>
+      
       <CopyButton
         content={content}
         language={language}
@@ -403,17 +384,13 @@ function CodeBlock({
         style={isDarkMode ? oneDark : oneLight}
         language={language || "text"}
         PreTag="div"
-        className={cn(
-          "rounded-lg border",
-          isDarkMode ? "border-slate-700" : themeColors.codeBorder
-        )}
         customStyle={{
           margin: 0,
-          borderRadius: "0.5rem",
+          borderRadius: 0,
+          background: colors.codeBlockBg,
           fontSize: "14px",
           lineHeight: "1.6",
-          padding: "1rem",
-          paddingTop: language ? "2.5rem" : "1rem",
+          padding: "1.5rem",
         }}
       >
         {content}
@@ -433,8 +410,13 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [colorTheme, setColorTheme] = useState<ColorTheme>("light");
-  const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Slash Command State
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashMenuPos, setSlashMenuPos] = useState({ top: 0, left: 0 });
+  const [slashFilter, setSlashFilter] = useState("");
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -444,17 +426,15 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
   const isLocalChange = useRef(false);
   const debouncedContent = useDebounce(content, 500);
+  const themeColors = isDarkMode ? darkThemes[colorTheme] : lightThemes[colorTheme];
 
   useEffect(() => {
     if (!socket) return;
-
     const handleUpdate = (newContent: string) => {
       isLocalChange.current = false;
       setContent(newContent);
     };
-
     socket.on("canvas-updated", handleUpdate);
-
     return () => {
       socket.off("canvas-updated", handleUpdate);
     };
@@ -467,6 +447,18 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     }
   }, [debouncedContent, canvasId, isConnected, socket]);
 
+  // Slash Command Filtering
+  const filteredCommands = useMemo(() => {
+      if(!slashFilter) return SLASH_COMMANDS;
+      const lowerFilter = slashFilter.toLowerCase();
+      
+      return SLASH_COMMANDS.filter(cmd => 
+        cmd.label.toLowerCase().includes(lowerFilter) || 
+        cmd.shortcut?.toLowerCase().includes(lowerFilter)
+      );
+  }, [slashFilter]);
+
+  // Insert HTML util
   const insertHtmlTag = (prefix: string, suffix: string, blockMode: boolean = false) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -496,6 +488,34 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
         textarea.selectionEnd = selectionStart + pre.length;
       }
     }, 0);
+  };
+
+  const executeSlashCommand = (cmd: CommandItem) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const { selectionStart } = textarea;
+      
+      const textBeforeCursor = content.substring(0, selectionStart);
+      const lastSlashIndex = textBeforeCursor.lastIndexOf("/");
+      
+      if (lastSlashIndex === -1) return;
+
+      const beforeSlash = content.substring(0, lastSlashIndex);
+      const afterCursor = content.substring(selectionStart);
+      
+      const newContent = beforeSlash + cmd.value + afterCursor;
+
+      setContent(newContent);
+      setShowSlashMenu(false);
+      setSlashFilter("");
+      isLocalChange.current = true;
+
+      setTimeout(() => {
+          textarea.focus();
+          const newPos = lastSlashIndex + cmd.offset;
+          textarea.selectionStart = textarea.selectionEnd = newPos;
+      }, 0);
   };
 
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
@@ -552,9 +572,9 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
                 
                 const codeExtensions = ['js', 'ts', 'py', 'java', 'c', 'cpp', 'json', 'html', 'css'];
                 if (codeExtensions.includes(fileExtension || '')) {
-                     importedContent = `\n\`\`\`${fileExtension}\n${text}\n\`\`\`\n`;
+                      importedContent = `\n\`\`\`${fileExtension}\n${text}\n\`\`\`\n`;
                 } else {
-                     importedContent = `\n${text}\n`;
+                      importedContent = `\n${text}\n`;
                 }
 
                 insertTextAtPosition(importedContent, insertPos);
@@ -576,6 +596,31 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     const textarea = e.currentTarget;
     const { selectionStart, selectionEnd } = textarea;
 
+    if (showSlashMenu) {
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setSlashSelectedIndex((prev) => (prev + 1) % filteredCommands.length);
+            return;
+        }
+        if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setSlashSelectedIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+            return;
+        }
+        if (e.key === "Enter") {
+            e.preventDefault();
+            if (filteredCommands[slashSelectedIndex]) {
+                executeSlashCommand(filteredCommands[slashSelectedIndex]);
+            }
+            return;
+        }
+        if (e.key === "Escape") {
+            e.preventDefault();
+            setShowSlashMenu(false);
+            return;
+        }
+    }
+
     if (e.key === "Tab") {
       e.preventDefault();
       const beforeCursor = content.substring(0, selectionStart);
@@ -590,7 +635,7 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
       return;
     }
 
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !showSlashMenu) {
       const beforeCursor = content.substring(0, selectionStart);
       const lines = beforeCursor.split("\n");
       const currentLine = lines[lines.length - 1];
@@ -601,6 +646,14 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
         if (match) {
           const indent = match[1];
           const bullet = match[2];
+          const textAfterBullet = currentLine.replace(match[0], "").trim();
+          
+          if (!textAfterBullet) {
+             const newContent = content.substring(0, selectionStart - bullet.length - indent.length) + "\n" + content.substring(selectionEnd);
+             setContent(newContent);
+             return;
+          }
+
           insertText(`\n${indent}${bullet}`);
         }
         return;
@@ -612,6 +665,14 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
         if (match) {
           const indent = match[1];
           const nextNum = parseInt(match[2]) + 1;
+          const textAfterNum = currentLine.replace(match[0], "").trim();
+
+           if (!textAfterNum) {
+             const newContent = content.substring(0, selectionStart - match[0].length) + "\n" + content.substring(selectionEnd);
+             setContent(newContent);
+             return;
+          }
+
           insertText(`\n${indent}${nextNum}. `);
         }
         return;
@@ -641,98 +702,30 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     const newValue = textarea.value;
     const { selectionStart } = textarea;
 
-    if (newValue[selectionStart - 1] === " ") {
-      const beforeCursor = newValue.substring(0, selectionStart - 1);
-      const afterCursor = newValue.substring(selectionStart);
-      const words = beforeCursor.split(/\s/);
-      const lastWord = words[words.length - 1];
-
-      if (lastWord.startsWith("/")) {
-        const command = lastWord.substring(1).toLowerCase();
-        let replacement = "";
-        let cursorOffset = 0;
-
-        switch (command) {
-          case "code":
-            replacement = "```\n// Add your code here\n```";
-            cursorOffset = 4;
-            break;
-          case "js":
-          case "javascript":
-            replacement =
-              "```javascript\n// Add your JavaScript code here\nconsole.log('Hello, World!');\n```";
-            cursorOffset = 13;
-            break;
-          case "ts":
-          case "typescript":
-            replacement =
-              "```typescript\n// Add your TypeScript code here\ninterface Example {\n  message: string;\n}\n\nconst example: Example = {\n  message: 'Hello, World!'\n};\n```";
-            cursorOffset = 14;
-            break;
-          case "py":
-          case "python":
-            replacement =
-              "```python\n# Add your Python code here\ndef hello_world():\n    print('Hello, World!')\n\nhello_world()\n```";
-            cursorOffset = 10;
-            break;
-          case "md":
-          case "markdown":
-            replacement =
-              "```markdown\n# Add your Markdown content here\n\n**Bold text** and *italic text*\n\n- List item 1\n- List item 2\n```";
-            cursorOffset = 12;
-            break;
-          case "json":
-            replacement =
-              '```json\n{\n  "key": "value",\n  "number": 123,\n  "boolean": true\n}\n```';
-            cursorOffset = 8;
-            break;
-          case "h1":
-            replacement = "# ";
-            cursorOffset = 2;
-            break;
-          case "h2":
-            replacement = "## ";
-            cursorOffset = 3;
-            break;
-          case "h3":
-            replacement = "### ";
-            cursorOffset = 4;
-            break;
-          case "quote":
-            replacement = "> ";
-            cursorOffset = 2;
-            break;
-          case "todo":
-            replacement = "- [ ] ";
-            cursorOffset = 6;
-            break;
-          case "table":
-            replacement =
-              "| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |";
-            cursorOffset = 12;
-            break;
-          case "math":
-            replacement = "\n$$\nx = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}\n$$\n";
-            cursorOffset = 41;
-            break;
+    const beforeCursor = newValue.substring(0, selectionStart);
+    const lastSlash = beforeCursor.lastIndexOf("/");
+    
+    if (lastSlash !== -1) {
+        const textAfterSlash = beforeCursor.substring(lastSlash + 1);
+        const charBeforeSlash = beforeCursor[lastSlash - 1];
+        
+        if (
+            (!charBeforeSlash || charBeforeSlash === " " || charBeforeSlash === "\n") && 
+            !textAfterSlash.includes(" ") &&
+            !textAfterSlash.includes("\n")
+        ) {
+             if (!showSlashMenu) {
+                 const coords = getCaretCoordinates(textarea, selectionStart);
+                 setSlashMenuPos({ top: coords.top + 24, left: coords.left });
+                 setShowSlashMenu(true);
+             }
+             setSlashFilter(textAfterSlash);
+             setSlashSelectedIndex(0);
+        } else {
+            setShowSlashMenu(false);
         }
-
-        if (replacement) {
-          e.preventDefault();
-          const newContent =
-            beforeCursor.replace(lastWord, replacement) + afterCursor;
-          setContent(newContent);
-          isLocalChange.current = true;
-
-          setTimeout(() => {
-            const newPosition =
-              selectionStart - lastWord.length - 1 + cursorOffset;
-            textarea.selectionStart = textarea.selectionEnd = newPosition;
-            textarea.focus();
-          }, 0);
-          return;
-        }
-      }
+    } else {
+        setShowSlashMenu(false);
     }
 
     setContent(newValue);
@@ -787,35 +780,14 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
 
   const getPlaceholderText = () => {
     if (!content.trim()) {
-      return `Type '/' for commands, or start writing...
-
-Quick Commands:
-/math [space] - Insert equation
-/js [space] - JavaScript code block
-/ts [space] - TypeScript code block  
-/py [space] - Python code block
-/md [space] - Markdown code block
-/json [space] - JSON code block
-/code [space] - Generic code block
-/h1, /h2, /h3 [space] - Headers
-/quote [space] - Quote block
-/todo [space] - Checklist item
-/table [space] - Table template
-
-Shortcuts:
-Cmd/Ctrl + B - Bold
-Cmd/Ctrl + I - Italic
-Cmd/Ctrl + K - Link
-Tab - Indent`;
+      return `Type '/' for commands...`;
     }
     return "Continue writing...";
   };
 
   const exportToPDF = async () => {
     if (!previewRef.current) return;
-
     setIsExporting(true);
-
     try {
       const clonedContent = previewRef.current.cloneNode(true) as HTMLElement;
       const buttons = clonedContent.querySelectorAll("button");
@@ -825,74 +797,32 @@ Tab - Indent`;
       allElements.forEach((element) => {
         const htmlElement = element as HTMLElement;
         const computedStyle = window.getComputedStyle(htmlElement);
-
-        const color = computedStyle.color;
-        const backgroundColor = computedStyle.backgroundColor;
-        const borderColor = computedStyle.borderColor;
-        const textAlign = computedStyle.textAlign; 
-        const fontFamily = computedStyle.fontFamily;
-        const fontSize = computedStyle.fontSize;
-
-        if (color && color !== "rgba(0, 0, 0, 0)" && !color.includes("oklch")) {
-          htmlElement.style.color = color;
-        }
-        if (
-          backgroundColor &&
-          backgroundColor !== "rgba(0, 0, 0, 0)" &&
-          !backgroundColor.includes("oklch")
-        ) {
-          htmlElement.style.backgroundColor = backgroundColor;
-        }
-        if (
-          borderColor &&
-          borderColor !== "rgba(0, 0, 0, 0)" &&
-          !borderColor.includes("oklch")
-        ) {
-          htmlElement.style.borderColor = borderColor;
-        }
-        if (textAlign) htmlElement.style.textAlign = textAlign;
-        if (fontFamily) htmlElement.style.fontFamily = fontFamily;
-        if (fontSize) htmlElement.style.fontSize = fontSize;
+        if (computedStyle.color) htmlElement.style.color = computedStyle.color;
+        if (computedStyle.backgroundColor) htmlElement.style.backgroundColor = computedStyle.backgroundColor;
+        if (computedStyle.fontFamily) htmlElement.style.fontFamily = computedStyle.fontFamily;
       });
 
       const previewContent = clonedContent.innerHTML;
       const printWindow = window.open("", "_blank");
       
-      if (!printWindow) {
-        throw new Error("Please allow pop-ups to export PDF");
-      }
+      if (!printWindow) throw new Error("Please allow pop-ups to export PDF");
       
       const htmlContent = `
         <!DOCTYPE html>
         <html>
           <head>
             <meta charset="utf-8">
-            <title>Canvas Export - ${canvasId}</title>
+            <title>${canvasId || 'Document'}</title>
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.css">
             <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                line-height: 1.6;
-                color: rgb(26, 26, 26);
-                background: rgb(255, 255, 255);
-                padding: 40px;
-                max-width: 800px;
-                margin: 0 auto;
-              }
-              h1 { font-size: 2em; margin: 1em 0 0.5em 0; font-weight: bold; }
-              h2 { font-size: 1.5em; margin: 0.83em 0 0.5em 0; font-weight: bold; }
-              h3 { font-size: 1.17em; margin: 1em 0 0.5em 0; font-weight: bold; }
-              p { margin: 1em 0; }
-              code { background: rgb(245, 245, 245); padding: 2px 6px; border-radius: 3px; }
-              pre { background: rgb(245, 245, 245); padding: 16px; border-radius: 6px; overflow-x: auto; margin: 1em 0; }
-              blockquote { border-left: 4px solid rgb(0, 102, 204); padding-left: 16px; margin: 1em 0; }
-              table { border-collapse: collapse; width: 100%; margin: 1em 0; }
-              th, td { border: 1px solid rgb(221, 221, 221); padding: 12px; text-align: left; }
-              th { background: rgb(245, 245, 245); font-weight: bold; }
-              button { display: none !important; }
-              .katex { font-size: 1.1em; } 
-              @media print { body { padding: 20px; } @page { margin: 2cm; } }
+              body { font-family: -apple-system, sans-serif; line-height: 1.6; padding: 40px; max-width: 800px; margin: 0 auto; color: #1a1a1a; }
+              img { max-width: 100%; }
+              pre { background: #f5f5f5; padding: 15px; border-radius: 5px; }
+              code { font-family: monospace; background: #f5f5f5; padding: 2px 5px; border-radius: 3px; }
+              blockquote { border-left: 4px solid #ddd; padding-left: 15px; color: #666; }
+              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+              @media print { body { padding: 0; } }
             </style>
           </head>
           <body>${previewContent}</body>
@@ -910,12 +840,7 @@ Tab - Indent`;
         }, 500);
       };
     } catch (error) {
-      console.error("Failed to export PDF:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to export PDF. Please try again."
-      );
+      console.error(error);
       setIsExporting(false);
     }
   };
@@ -931,7 +856,7 @@ Tab - Indent`;
       let importedContent = "";
 
       if (fileExtension === 'pdf') {
-        alert("PDF import requires pdf.js library. Please install it in your project:\nnpm install pdfjs-dist");
+        alert("PDF import requires pdf.js library.");
         return;
       }
 
@@ -943,40 +868,16 @@ Tab - Indent`;
         reader.onload = (e) => {
           const text = e.target?.result as string;
           if (text) {
-            const textarea = textareaRef.current;
+             const textarea = textareaRef.current;
             if (!textarea) {
               setContent(text);
               isLocalChange.current = true;
               return;
             }
-
-            const languageMap: Record<string, string> = {
-              'js': 'javascript',
-              'jsx': 'javascript',
-              'ts': 'typescript',
-              'tsx': 'typescript',
-              'py': 'python',
-              'java': 'java',
-              'cpp': 'cpp',
-              'c': 'c',
-              'h': 'c',
-              'rs': 'rust',
-              'go': 'go',
-              'yml': 'yaml',
-              'yaml': 'yaml',
-              'json': 'json',
-              'xml': 'xml',
-              'html': 'html',
-              'css': 'css',
-              'scss': 'scss',
-            };
-
-            const language = languageMap[fileExtension || ''] || fileExtension;
-            
-            if (language && !['txt', 'md', 'markdown'].includes(fileExtension || '')) {
-              importedContent = `\n\n\`\`\`${language}\n${text}\n\`\`\`\n\n`;
+            if (['txt', 'md', 'markdown'].includes(fileExtension || '')) {
+                 importedContent = `\n\n${text}\n\n`;
             } else {
-              importedContent = `\n\n${text}\n\n`;
+                 importedContent = `\n\n\`\`\`${fileExtension}\n${text}\n\`\`\`\n\n`;
             }
 
             const { selectionStart } = textarea;
@@ -986,26 +887,14 @@ Tab - Indent`;
             
             setContent(newContent);
             isLocalChange.current = true;
-
-            setTimeout(() => {
-              const newPosition = selectionStart + importedContent.length;
-              textarea.selectionStart = textarea.selectionEnd = newPosition;
-              textarea.focus();
-            }, 0);
           }
         };
-
-        reader.onerror = () => {
-          alert("Failed to read file. Please try again.");
-        };
-
         reader.readAsText(file);
       } else {
-        alert(`Unsupported file type: .${fileExtension}\n\nSupported formats:\n- Text: .txt, .md, .markdown\n- Code: .js, .jsx, .ts, .tsx, .py, .java, .cpp, .c, .h, .rs, .go\n- Config: .yml, .yaml, .json, .xml\n- Web: .html, .css, .scss`);
+        alert(`Unsupported file type.`);
       }
     } catch (error) {
-      console.error("Failed to import file:", error);
-      alert("Failed to import file. Please try again.");
+      console.error(error);
     }
 
     if (fileInputRef.current) {
@@ -1017,231 +906,79 @@ Tab - Indent`;
     fileInputRef.current?.click();
   };
 
-  const themeColors = isDarkMode ? darkThemes[colorTheme] : lightThemes[colorTheme];
-
-  const ThemeSelector = () => (
-    <div className="absolute z-20 right-0 mt-2 w-36">
-      <div
-        className={cn(
-          "rounded-lg shadow-lg border",
-          isDarkMode
-            ? "bg-slate-800 border-slate-700"
-            : "bg-white border-gray-200"
-        )}
-      >
-        <button
-          onClick={() => {
-            setColorTheme("light");
-            setShowThemeMenu(false);
-          }}
-          className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 rounded-t-lg transition-colors",
-            colorTheme === "light" &&
-              (isDarkMode ? "bg-slate-700" : "bg-indigo-100"),
-            isDarkMode ? "text-white hover:bg-slate-700" : "text-gray-900 hover:bg-gray-100"
-          )}
-        >
-          Indigo
-        </button>
-        <button
-          onClick={() => {
-            setColorTheme("nord");
-            setShowThemeMenu(false);
-          }}
-          className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
-            colorTheme === "nord" &&
-              (isDarkMode ? "bg-slate-700" : "bg-slate-100"),
-            isDarkMode
-              ? "text-white border-slate-700 hover:bg-slate-700"
-              : "text-gray-900 border-gray-200 hover:bg-gray-100"
-          )}
-        >
-          Nord
-        </button>
-        <button
-          onClick={() => {
-            setColorTheme("slate");
-            setShowThemeMenu(false);
-          }}
-          className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t transition-colors",
-            colorTheme === "slate" &&
-              (isDarkMode ? "bg-slate-700" : "bg-emerald-100"),
-            isDarkMode
-              ? "text-white border-slate-700 hover:bg-slate-700"
-              : "text-gray-900 border-gray-200 hover:bg-gray-100"
-          )}
-        >
-          Emerald
-        </button>
-        <button
-          onClick={() => {
-            setColorTheme("ocean");
-            setShowThemeMenu(false);
-          }}
-          className={cn(
-            "w-full px-4 py-2 text-sm text-left hover:bg-opacity-80 border-t rounded-b-lg transition-colors",
-            colorTheme === "ocean" &&
-              (isDarkMode ? "bg-slate-700" : "bg-cyan-100"),
-            isDarkMode
-              ? "text-white border-slate-700 hover:bg-slate-700"
-              : "text-gray-900 border-gray-200 hover:bg-gray-100"
-          )}
-        >
-          Ocean
-        </button>
-      </div>
-    </div>
-  );
-
   const FormattingToolbar = () => (
     <div className={cn(
-        "flex flex-wrap items-center gap-2 p-2 border-b",
-        isDarkMode ? "border-slate-700 bg-slate-900/50" : "border-gray-200 bg-gray-50/50"
+        "sticky top-0 z-10 flex flex-wrap items-center gap-1.5 p-2 border-b backdrop-blur-md transition-colors duration-300",
+        isDarkMode 
+            ? "bg-black/60 border-white/5" 
+            : "bg-white/80 border-gray-100"
     )}>
-        {/* Alignment Tools */}
-        <div className="flex items-center rounded-md border overflow-hidden shadow-sm">
-            <Button
-                variant="ghost"
-                size="sm"
-                className={cn("h-8 w-8 p-1 rounded-none", isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700")}
-                onClick={() => insertHtmlTag('<div style="text-align: left">', '</div>', true)}
-                title="Align Left"
-            >
-                <AlignLeft className="h-4 w-4" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="sm"
-                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
-                onClick={() => insertHtmlTag('<div style="text-align: center">', '</div>', true)}
-                title="Align Center"
-            >
-                <AlignCenter className="h-4 w-4" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="sm"
-                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
-                onClick={() => insertHtmlTag('<div style="text-align: right">', '</div>', true)}
-                title="Align Right"
-            >
-                <AlignRight className="h-4 w-4" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="sm"
-                className={cn("h-8 w-8 p-1 rounded-none border-l", isDarkMode ? "border-slate-700 hover:bg-slate-700 text-white" : "border-gray-200 hover:bg-gray-200 text-gray-700")}
-                onClick={() => insertHtmlTag('<div style="text-align: justify">', '</div>', true)}
-                title="Align Justify"
-            >
-                <AlignJustify className="h-4 w-4" />
-            </Button>
-        </div>
-
-        <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
-
-        {/* Font Family Selector */}
-        <div className="flex items-center gap-1">
-            <Type className={cn("h-4 w-4 mr-1", isDarkMode ? "text-gray-400" : "text-gray-500")} />
-            <Select onValueChange={(value) => insertHtmlTag(`<span style="font-family: ${value}">`, '</span>')}>
-                <SelectTrigger className={cn("h-8 w-[120px] text-xs shadow-sm", isDarkMode ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-300 text-gray-900")}>
-                    <SelectValue placeholder="Font" />
-                </SelectTrigger>
-                <SelectContent>
-                    {FONT_OPTIONS.map((font) => (
-                        <SelectItem key={font.value} value={font.value} style={{ fontFamily: font.value }}>
-                            {font.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </div>
-
-        {/* Font Size Selector */}
-        <div className="flex items-center gap-1">
-            <Scaling className={cn("h-4 w-4 mr-1", isDarkMode ? "text-gray-400" : "text-gray-500")} />
-            <Select onValueChange={(value) => insertHtmlTag(`<span style="font-size: ${value}">`, '</span>')}>
-                <SelectTrigger className={cn("h-8 w-[100px] text-xs shadow-sm", isDarkMode ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-gray-300 text-gray-900")}>
-                    <SelectValue placeholder="Size" />
-                </SelectTrigger>
-                <SelectContent>
-                    {FONT_SIZE_OPTIONS.map((size) => (
-                        <SelectItem key={size.value} value={size.value}>
-                            {size.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </div>
-
-        <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
-
-        {/* Color Pickers */}
-        <div className="flex items-center gap-2 group relative">
-             <div className="relative">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                        "h-8 w-8 p-1 relative overflow-hidden",
-                        isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700"
-                    )}
-                    title="Text Color"
-                    onClick={() => {
-                        const colorInput = document.getElementById("text-color-picker");
-                        if (colorInput) colorInput.click();
-                    }}
-                >
-                    <Baseline className="h-4 w-4" />
-                    <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-gradient-to-tr from-red-500 via-green-500 to-blue-500" />
+        {/* Alignment */}
+        <div className="flex items-center rounded-lg overflow-hidden bg-transparent p-0.5 gap-0.5">
+            {[
+                { icon: AlignLeft, action: () => insertHtmlTag('<div style="text-align: left">', '</div>', true) },
+                { icon: AlignCenter, action: () => insertHtmlTag('<div style="text-align: center">', '</div>', true) },
+                { icon: AlignRight, action: () => insertHtmlTag('<div style="text-align: right">', '</div>', true) },
+                { icon: AlignJustify, action: () => insertHtmlTag('<div style="text-align: justify">', '</div>', true) },
+            ].map((tool, i) => (
+                <Button key={i} variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={tool.action}>
+                    <tool.icon className={cn("h-3.5 w-3.5", themeColors.mutedText)} />
                 </Button>
-                <input
-                    type="color"
-                    id="text-color-picker"
-                    className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
-                    onChange={(e) => insertHtmlTag(`<span style="color: ${e.target.value}">`, '</span>')}
-                />
+            ))}
+        </div>
+
+        <div className={cn("h-4 w-[1px] mx-1", themeColors.border)} />
+
+        {/* Font Family */}
+        <Select onValueChange={(value) => insertHtmlTag(`<span style="font-family: ${value}">`, '</span>')}>
+            <SelectTrigger className="h-7 w-[110px] text-xs border-0 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:ring-0">
+                <SelectValue placeholder="Font" />
+            </SelectTrigger>
+            <SelectContent>
+                {FONT_OPTIONS.map((font) => (
+                    <SelectItem key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+                        {font.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+
+        {/* Font Size */}
+        <Select onValueChange={(value) => insertHtmlTag(`<span style="font-size: ${value}">`, '</span>')}>
+            <SelectTrigger className="h-7 w-[90px] text-xs border-0 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:ring-0">
+                <SelectValue placeholder="Size" />
+            </SelectTrigger>
+            <SelectContent>
+                {FONT_SIZE_OPTIONS.map((size) => (
+                    <SelectItem key={size.value} value={size.value}>
+                        {size.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+
+        <div className={cn("h-4 w-[1px] mx-1", themeColors.border)} />
+
+        {/* Colors */}
+        <div className="flex items-center gap-1">
+             <div className="relative group">
+                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => document.getElementById("text-color-picker")?.click()}>
+                    <Baseline className={cn("h-3.5 w-3.5", themeColors.mutedText)} />
+                </Button>
+                <input type="color" id="text-color-picker" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={(e) => insertHtmlTag(`<span style="color: ${e.target.value}">`, '</span>')} />
              </div>
-
-             <div className="relative">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                        "h-8 w-8 p-1 relative overflow-hidden",
-                        isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700"
-                    )}
-                    title="Highlight Text"
-                    onClick={() => {
-                        const bgInput = document.getElementById("bg-color-picker");
-                        if (bgInput) bgInput.click();
-                    }}
-                >
-                    <Highlighter className="h-4 w-4" />
-                    <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 border border-black/10" />
+             <div className="relative group">
+                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => document.getElementById("bg-color-picker")?.click()}>
+                    <Highlighter className={cn("h-3.5 w-3.5", themeColors.mutedText)} />
                 </Button>
-                <input
-                    type="color"
-                    id="bg-color-picker"
-                    className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
-                    onChange={(e) => insertHtmlTag(`<span style="background-color: ${e.target.value}">`, '</span>')}
-                />
+                <input type="color" id="bg-color-picker" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={(e) => insertHtmlTag(`<span style="background-color: ${e.target.value}">`, '</span>')} />
              </div>
         </div>
 
-        <div className={cn("h-6 w-[1px] mx-1", isDarkMode ? "bg-slate-700" : "bg-gray-300")} />
+         <div className={cn("h-4 w-[1px] mx-1", themeColors.border)} />
 
-        {/* Math Button */}
-        <Button
-            variant="ghost"
-            size="sm"
-            className={cn("h-8 w-8 p-1", isDarkMode ? "hover:bg-slate-700 text-white" : "hover:bg-gray-200 text-gray-700")}
-            onClick={() => insertHtmlTag('\n$$\n', '\n$$\n', false)}
-            title="Insert Equation"
-        >
-            <Sigma className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => insertHtmlTag('\n$$\n', '\n$$\n', false)}>
+            <Sigma className={cn("h-3.5 w-3.5", themeColors.mutedText)} />
         </Button>
     </div>
   );
@@ -1250,13 +987,13 @@ Tab - Indent`;
     <article
       ref={previewRef}
       onDoubleClick={() => setIsEditMode(true)}
-      title="Double-click to edit"
       className={cn(
-        "prose max-w-none p-4 sm:p-6",
-        isDarkMode
-          ? "prose-invert prose-headings:text-white prose-p:text-gray-300 prose-strong:text-white prose-a:text-blue-400 prose-blockquote:text-gray-300"
-          : "",
-        "cursor-pointer" 
+        "prose max-w-none p-8 sm:p-12 transition-all duration-300",
+        "prose-headings:font-semibold prose-headings:tracking-tight",
+        "prose-p:leading-relaxed prose-li:my-1",
+        "prose-pre:bg-transparent prose-pre:p-0 prose-pre:m-0", 
+        themeColors.proseClass,
+        "cursor-text min-h-[500px]"
       )}
     >
       {content.trim() ? (
@@ -1265,265 +1002,30 @@ Tab - Indent`;
           rehypePlugins={[rehypeKatex, rehypeRaw]}
           components={{
             code: (props) => (
-              <CodeBlock
-                {...props}
-                isDarkMode={isDarkMode}
-                theme={colorTheme}
-              />
+              <CodeBlock {...props} isDarkMode={isDarkMode} theme={colorTheme} />
             ),
-            blockquote(props) {
-              const blockquoteContent = extractTextContent(props.children);
-              return (
-                <div className="relative group">
-                  <CopyButton
-                    content={blockquoteContent}
-                    isDarkMode={isDarkMode}
-                    theme={colorTheme}
-                  />
-                  <blockquote
-                    className={cn(
-                      "border-l-4 pl-4 py-2 italic my-4 rounded-r-md transition-colors",
-                      isDarkMode
-                        ? "border-blue-500 bg-blue-900/30 text-gray-100 hover:bg-blue-900/50"
-                        : cn(
-                            themeColors.blockquoteBorder,
-                            themeColors.blockquoteBg,
-                            themeColors.blockquoteText,
-                            "hover:bg-opacity-80"
-                          )
-                    )}
-                  >
-                    {props.children}
-                  </blockquote>
+            blockquote: (props) => (
+                <div className="relative group my-6 pl-4 border-l-2 border-indigo-500/50 italic opacity-80">
+                   {props.children}
                 </div>
-              );
-            },
-            p(props) {
-              const paragraphContent = extractTextContent(props.children);
-              return (
-                <div className="relative group">
-                  <CopyButton
-                    content={paragraphContent}
-                    isDarkMode={isDarkMode}
-                    theme={colorTheme}
-                  />
-                  <p className={cn(
-                    "p-1 rounded-md transition-colors",
-                    isDarkMode ? "text-gray-300 hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
-                  )}>
-                    {props.children}
-                  </p>
+            ),
+            table: (props) => (
+                <div className="overflow-x-auto my-6 rounded-lg border border-opacity-50">
+                    <table className="w-full text-sm text-left">
+                        {props.children}
+                    </table>
                 </div>
-              );
-            },
-            strong(props) {
-              return (
-                <strong
-                  className={cn(
-                    "font-bold",
-                    isDarkMode ? "text-white" : themeColors.text
-                  )}
-                >
-                  {props.children}
-                </strong>
-              );
-            },
-            em(props) {
-              return (
-                <em
-                  className={cn(
-                    "italic",
-                    isDarkMode
-                      ? "text-blue-200"
-                      : cn(themeColors.linkColor, themeColors.linkHover)
-                  )}
-                >
-                  {props.children}
-                </em>
-              );
-            },
-            a(props) {
-              const href = props.href || "";
-              const secureHref = href.startsWith("http://")
-                ? href.replace("http://", "https://")
-                : href.startsWith("https://") ||
-                  href.startsWith("/") ||
-                  href.startsWith("#")
-                ? href
-                : `https://${href}`;
-
-              return (
-                <a
-                  href={secureHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    "underline",
-                    isDarkMode
-                      ? "text-blue-400 hover:text-blue-300"
-                      : cn(themeColors.linkColor, themeColors.linkHover)
-                  )}
-                >
-                  {props.children}
-                </a>
-              );
-            },
-            table(props) {
-              return (
-                <div className="overflow-x-auto my-4">
-                  <table
-                    className={cn(
-                      "w-full border-collapse border rounded-lg",
-                      isDarkMode ? "border-blue-600" : themeColors.tableBorder
-                    )}
-                  >
-                    {props.children}
-                  </table>
-                </div>
-              );
-            },
-            th(props) {
-              return (
-                <th
-                  className={cn(
-                    "border px-4 py-2 font-semibold text-left",
-                    isDarkMode
-                      ? "border-blue-600 bg-blue-900/60 text-white"
-                      : cn(
-                          themeColors.tableBorder,
-                          themeColors.tableHeaderBg,
-                          themeColors.tableHeaderText
-                        )
-                  )}
-                >
-                  {props.children}
-                </th>
-              );
-            },
-            td(props) {
-              return (
-                <td
-                  className={cn(
-                    "border px-4 py-2",
-                    isDarkMode
-                      ? "border-blue-600 text-gray-100"
-                      : cn(
-                          themeColors.tableBorder,
-                          themeColors.tableText
-                        )
-                  )}
-                >
-                  {props.children}
-                </td>
-              );
-            },
-            ul(props) {
-              return (
-                <ul
-                  className={cn(
-                    "list-disc list-inside space-y-1 p-1 rounded-md transition-colors",
-                    isDarkMode ? "text-gray-100 hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
-                  )}
-                >
-                  {props.children}
-                </ul>
-              );
-            },
-            ol(props) {
-              return (
-                <ol
-                  className={cn(
-                    "list-decimal list-inside space-y-1 p-1 rounded-md transition-colors",
-                    isDarkMode ? "text-gray-100 hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
-                  )}
-                >
-                  {props.children}
-                </ol>
-              );
-            },
-            li(props) {
-              return (
-                <li className={isDarkMode ? "text-gray-100" : themeColors.text}>
-                  {props.children}
-                </li>
-              );
-            },
-            h1(props) {
-              return (
-                <h1
-                  className={cn(
-                    "font-bold p-1 rounded-md transition-colors",
-                    isDarkMode ? "text-white hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
-                  )}
-                >
-                  {props.children}
-                </h1>
-              );
-            },
-            h2(props) {
-              return (
-                <h2
-                  className={cn(
-                    "font-bold p-1 rounded-md transition-colors",
-                    isDarkMode ? "text-white hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
-                  )}
-                >
-                  {props.children}
-                </h2>
-              );
-            },
-            h3(props) {
-              return (
-                <h3
-                  className={cn(
-                    "font-bold p-1 rounded-md transition-colors",
-                    isDarkMode ? "text-white hover:bg-indigo-900/50" : cn(themeColors.text, "hover:bg-indigo-100/50")
-                  )}
-                >
-                  {props.children}
-                </h3>
-              );
-            },
-            div(props) {
-                return <div {...props} className={cn("my-2", props.className)} />;
-            },
-            span(props) {
-                return <span {...props} />;
-            }
+            ),
+            th: ({children}) => <th className="px-6 py-3 bg-gray-50 dark:bg-white/5 font-medium uppercase tracking-wider text-xs">{children}</th>,
+            td: ({children}) => <td className="px-6 py-4 border-t border-gray-100 dark:border-white/5">{children}</td>
           }}
         >
           {content}
         </ReactMarkdown>
       ) : (
-        <div
-          className={cn(
-            "italic text-center py-12",
-            isDarkMode ? "text-blue-200/60" : "text-gray-400"
-          )}
-        >
-          <div className="text-4xl mb-4">✨</div>
-          <p className={isDarkMode ? "text-blue-200" : "text-gray-600"}>
-            Start typing to see your content come to life...
-          </p>
-          <p
-            className={cn(
-              "text-sm mt-2",
-              isDarkMode ? "text-blue-300/70" : "text-gray-500"
-            )}
-          >
-            Use{" "}
-            <code
-              className={cn(
-                "px-2 py-1 rounded",
-                isDarkMode
-                  ? "bg-blue-800/60 text-white"
-                  : cn(themeColors.codeBg, themeColors.codeText)
-              )}
-            >
-              /
-            </code>{" "}
-            commands for quick formatting
-          </p>
+        <div className="flex flex-col items-center justify-center h-64 opacity-40">
+           <Edit3 className="w-12 h-12 mb-4" strokeWidth={1.5} />
+           <p className="text-sm font-medium">Start writing to preview content...</p>
         </div>
       )}
     </article>
@@ -1532,8 +1034,8 @@ Tab - Indent`;
   return (
     <div
       className={cn(
-        "h-full w-full relative",
-        isDarkMode ? themeColors.bg : themeColors.bg
+        "flex flex-col h-screen w-full relative transition-colors duration-500 overflow-hidden",
+        themeColors.appBg
       )}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -1548,159 +1050,169 @@ Tab - Indent`;
         className="hidden"
       />
 
-      {isDragging && (
-        <div className="absolute inset-0 z-50 bg-blue-500/20 backdrop-blur-sm border-4 border-dashed border-blue-500 m-4 rounded-xl flex items-center justify-center pointer-events-none">
-            <div className="bg-white/90 dark:bg-slate-800/90 p-8 rounded-xl shadow-xl flex flex-col items-center gap-4">
-                <FileUp className="h-16 w-16 text-blue-500 animate-bounce" />
-                <h3 className="text-xl font-bold text-slate-800 dark:text-white">Drop files here</h3>
-                <p className="text-slate-500 dark:text-slate-300">Import text, code, or images</p>
-            </div>
-        </div>
-      )}
+      <header className={cn(
+          "flex-none px-6 py-3 flex items-center justify-between border-b sticky top-0 z-50 backdrop-blur-xl",
+          isDarkMode ? "bg-black/40 border-white/5" : "bg-white/60 border-gray-200/50"
+      )}>
+          <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                 <div className={cn("w-2.5 h-2.5 rounded-full animate-pulse", isConnected ? "bg-emerald-500" : "bg-rose-500")} />
+                 <span className={cn("text-xs font-medium uppercase tracking-widest opacity-60", themeColors.text)}>
+                    {isConnected ? "Live" : "Offline"}
+                 </span>
+              </div>
+          </div>
 
-      <div className="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
-        <div className="relative">
-          <Button
-            onClick={() => setShowThemeMenu(!showThemeMenu)}
-            className="text-white bg-slate-700 hover:bg-slate-600"
-            size="sm"
-          >
-            <Palette className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Theme</span>
-          </Button>
-          {showThemeMenu && <ThemeSelector />}
-        </div>
-        <Button
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          className="text-white bg-slate-700 hover:bg-slate-600"
-          size="sm"
-        >
-          {isDarkMode ? (
-            <Sun className="h-4 w-4 sm:mr-2" />
-          ) : (
-            <Moon className="h-4 w-4 sm:mr-2" />
-          )}
-          <span className="hidden sm:inline">{isDarkMode ? "Light" : "Dark"}</span>
-        </Button>
-        <Button
-          onClick={triggerFileImport}
-          className="bg-purple-600 hover:bg-purple-700 text-white"
-          size="sm"
-        >
-          <Upload className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Import</span>
-        </Button>
-        <Button
-          onClick={exportToPDF}
-          disabled={isExporting || !content.trim()}
-          className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-          size="sm"
-        >
-          <Download className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">{isExporting ? "Exporting..." : "PDF"}</span>
-        </Button>
-        <Button
-          onClick={() => setIsEditMode(!isEditMode)}
-          className={cn(
-            "text-white",
-            isEditMode
-              ? "bg-green-600 hover:bg-green-700"
-              : "bg-blue-600 hover:bg-blue-700"
-          )}
-          size="sm"
-        >
-          {isEditMode ? (
-            <Eye className="h-4 w-4 sm:mr-2" />
-          ) : (
-            <Edit3 className="h-4 w-4 sm:mr-2" />
-          )}
-          <span className="hidden sm:inline">{isEditMode ? "Preview" : "Edit"}</span>
-        </Button>
-      </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground">
+                   <Palette className="h-4 w-4" />
+                   <span className="text-xs">Theme</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                  {(["light", "nord", "slate", "ocean"] as ColorTheme[]).map((t) => (
+                      <DropdownMenuItem key={t} onClick={() => setColorTheme(t)} className="capitalize">
+                          {t}
+                      </DropdownMenuItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-      <Card
-        className={cn(
-          "h-full overflow-y-auto border-0",
-          isDarkMode
-            ? themeColors.cardBg
-            : cn(themeColors.cardBg, themeColors.cardBorder)
-        )}
-      >
-        {isEditMode ? (
-          <div className="relative h-full flex flex-col">
-            <FormattingToolbar />
-            
-            <div className="relative flex-grow">
-              <Textarea
-                ref={textareaRef}
-                value={content}
-                onChange={() => {}}
-                onInput={handleInput}
-                onKeyDown={handleKeyDown}
-                onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
-                className={cn(
-                  "absolute inset-0 w-full h-full p-4 sm:p-6 border-0 rounded-md resize-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm leading-relaxed bg-transparent",
-                  isDarkMode
-                    ? "text-gray-100 placeholder:text-gray-500"
-                    : cn(themeColors.text, "placeholder:text-gray-400")
-                )}
-                placeholder=""
-                style={{
-                  minHeight: "100%",
-                  lineHeight: "1.6",
-                  fontFamily:
-                    'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Inconsolata, "Roboto Mono", monospace',
-                }}
-              />
-              {!content.trim() && (
-                <div
-                  className={cn(
-                    "absolute inset-4 sm:inset-6 pointer-events-none text-sm leading-relaxed whitespace-pre-line font-mono",
-                    isDarkMode ? "text-gray-500" : "text-gray-400"
-                  )}
-                >
-                  {getPlaceholderText()}
-                </div>
-              )}
-            </div>
-            <CardFooter
+            <Button variant="ghost" size="icon" onClick={() => setIsDarkMode(!isDarkMode)} className="h-8 w-8 text-muted-foreground">
+              {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+
+            <div className={cn("h-4 w-[1px] opacity-20 mx-1", isDarkMode ? "bg-white" : "bg-black")} />
+
+            <Button variant="ghost" size="sm" onClick={triggerFileImport} className="h-8 text-muted-foreground">
+              <Upload className="h-4 w-4 mr-2" />
+              Import
+            </Button>
+
+             <Button variant="ghost" size="sm" onClick={exportToPDF} disabled={isExporting} className="h-8 text-muted-foreground">
+              <Download className="h-4 w-4 mr-2" />
+              {isExporting ? "..." : "Export"}
+            </Button>
+
+            <Button
+              onClick={() => setIsEditMode(!isEditMode)}
+              size="sm"
               className={cn(
-                "py-2 px-4 sm:px-6 border-t",
-                isDarkMode
-                  ? cn(themeColors.cardBorder, "bg-opacity-50")
-                  : cn(themeColors.cardBorder, "bg-white/50")
+                "ml-2 h-8 px-4 transition-all shadow-sm font-medium",
+                isDarkMode 
+                    ? "bg-white text-black hover:bg-gray-200" 
+                    : "bg-black text-white hover:bg-gray-800"
               )}
             >
-              <div className="flex items-center justify-between w-full">
-                <div
-                  className={cn(
-                    "flex items-center gap-2 text-xs",
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  )}
-                >
-                  <div
+              {isEditMode ? (
+                <>
+                  <Eye className="h-3.5 w-3.5 mr-2" /> Preview
+                </>
+              ) : (
+                <>
+                  <Edit3 className="h-3.5 w-3.5 mr-2" /> Edit
+                </>
+              )}
+            </Button>
+          </div>
+      </header>
+
+      <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
+         <div className={cn(
+             "flex-1 w-full h-full transition-all duration-500 ease-out",
+             themeColors.appBg,
+             themeColors.text
+         )}>
+            {isEditMode ? (
+              <div className="flex flex-col min-h-full relative">
+                <FormattingToolbar />
+                
+                <div className="relative flex-1 group">
+                  <Textarea
+                    ref={textareaRef}
+                    value={content}
+                    onChange={() => {}}
+                    onInput={handleInput}
+                    onKeyDown={handleKeyDown}
+                    onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
                     className={cn(
-                      "h-2 w-2 rounded-full",
-                      isConnected ? "bg-green-500" : "bg-red-500"
+                      "w-full h-full min-h-[calc(100vh-140px)] p-8 sm:p-12 resize-none bg-transparent border-0 focus-visible:ring-0 font-mono text-base leading-7 selection:bg-indigo-500/20",
+                      themeColors.text,
+                      "placeholder:opacity-30 outline-none"
                     )}
+                    spellCheck={false}
+                    placeholder=""
                   />
-                  <span>{isConnected ? "Connected" : "Disconnected"}</span>
-                </div>
-                <div
-                  className={cn(
-                    "text-xs",
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
+                   {!content.trim() && (
+                    <div className={cn(
+                        "absolute top-12 left-12 pointer-events-none opacity-40 font-mono text-sm",
+                         themeColors.mutedText
+                    )}>
+                        {getPlaceholderText()}
+                    </div>
                   )}
-                >
-                  {content.length} chars | Line {content.substring(0, cursorPosition).split("\n").length}
+
+                  {showSlashMenu && (
+                      <div 
+                        className={cn(
+                            "absolute z-50 w-72 rounded-lg shadow-2xl overflow-hidden border animate-in fade-in zoom-in-95 duration-100",
+                            themeColors.menuBg,
+                            themeColors.border
+                        )}
+                        style={{
+                            top: slashMenuPos.top,
+                            left: slashMenuPos.left
+                        }}
+                      >
+                         <div className="px-3 py-2 text-xs font-semibold opacity-50 uppercase tracking-wider border-b">
+                            Block / Command
+                         </div>
+                         <div className="max-h-[300px] overflow-y-auto py-1">
+                             {filteredCommands.length > 0 ? (
+                                 filteredCommands.map((cmd, index) => (
+                                     <button
+                                        key={cmd.label}
+                                        onClick={() => executeSlashCommand(cmd)}
+                                        className={cn(
+                                            "w-full px-3 py-2 text-left flex items-center gap-3 transition-colors",
+                                            index === slashSelectedIndex ? themeColors.menuHover : "bg-transparent",
+                                            themeColors.text
+                                        )}
+                                     >
+                                         <div className="p-1 rounded border opacity-70">
+                                            <cmd.icon className="w-4 h-4" />
+                                         </div>
+                                         <div className="flex flex-col">
+                                             <div className="flex items-center gap-2">
+                                                 <span className="text-sm font-medium">{cmd.label}</span>
+                                                 {cmd.shortcut && slashFilter && (
+                                                     <span className="text-[10px] uppercase bg-indigo-500/20 px-1 rounded text-indigo-500">
+                                                        /{cmd.shortcut}
+                                                     </span>
+                                                 )}
+                                             </div>
+                                             <span className="text-xs opacity-50">{cmd.description}</span>
+                                         </div>
+                                     </button>
+                                 ))
+                             ) : (
+                                 <div className="px-4 py-3 text-sm opacity-50 text-center">
+                                     No commands found
+                                 </div>
+                             )}
+                         </div>
+                      </div>
+                  )}
+
                 </div>
               </div>
-            </CardFooter>
-          </div>
-        ) : (
-          <PreviewContent />
-        )}
-      </Card>
+            ) : (
+              <PreviewContent />
+            )}
+         </div>
+      </main>
     </div>
   );
 }
