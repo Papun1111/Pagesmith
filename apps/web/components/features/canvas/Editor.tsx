@@ -1,19 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, ReactNode, DragEvent, useMemo } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeRaw from "rehype-raw";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  type DragEvent,
+} from "react";
 import {
   Copy,
   Check,
-  Eye,
-  Edit3,
   Download,
   Upload,
   Moon,
@@ -23,16 +20,18 @@ import {
   AlignCenter,
   AlignRight,
   AlignJustify,
+  Bold,
+  Italic,
+  Underline,
+  Link,
   Type,
-  Baseline,
-  Highlighter,
-  FileUp,
   Sigma,
   Terminal,
   Heading1,
   Heading2,
   Heading3,
   List,
+  ListOrdered,
   ListTodo,
   Quote,
   Code2,
@@ -43,11 +42,19 @@ import {
   Braces,
   Coffee,
   FileType,
+  Minus,
+  Strikethrough,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
+import { marked } from "marked";
+import markedKatex from "marked-katex-extension";
+import "katex/dist/katex.min.css";
+
+marked.use(markedKatex({ throwOnError: false }));
 
 import { useSocket } from "@/hooks/useSocket";
 import { useDebounce } from "@/hooks/useDebounce";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -73,344 +80,364 @@ interface EditorProps {
   initialContent: string;
 }
 
-interface CodeBlockProps {
-  children?: ReactNode;
-  className?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
-}
-
-type ColorTheme = "light" | "nord" | "slate" | "ocean";
-
-interface ThemeColors {
-  appBg: string;
-  text: string;
-  mutedText: string;
-  border: string;
-  highlight: string;
-  codeBlockBg: string;
-  proseClass: string;
-  menuBg: string;
-  menuHover: string;
-}
+// Removed internal theme maps. Relying on global Tailwind `.dark` classes point-forward.
 
 interface CommandItem {
-    label: string;
-    description: string;
-    value: string;
-    offset: number;
-    icon: React.ElementType;
-    shortcut?: string; // Added for explicit searching like /js
+  label: string;
+  description: string;
+  action: (editor: HTMLDivElement) => void;
+  icon: React.ElementType;
+  shortcut?: string;
 }
 
 // ------------------------------------------------------------------
 // 2. Constants
 // ------------------------------------------------------------------
 
-// Expanded Slash Commands to include language-specific snippets
-const SLASH_COMMANDS: CommandItem[] = [
-    // --- Basic Formatting ---
-    { label: "Heading 1", description: "Big section heading", value: "# ", offset: 2, icon: Heading1 },
-    { label: "Heading 2", description: "Medium section heading", value: "## ", offset: 3, icon: Heading2 },
-    { label: "Heading 3", description: "Small section heading", value: "### ", offset: 4, icon: Heading3 },
-    { label: "Bullet List", description: "Create a simple list", value: "- ", offset: 2, icon: List },
-    { label: "To-do List", description: "Track tasks", value: "- [ ] ", offset: 6, icon: ListTodo },
-    { label: "Quote", description: "Capture a quote", value: "> ", offset: 2, icon: Quote },
-    { label: "Table", description: "Insert a table", value: "| Header | Header |\n| --- | --- |\n| Cell | Cell |", offset: 12, icon: TableIcon },
-    { label: "Math", description: "KaTeX Equation", value: "$$\n\n$$", offset: 3, icon: Sigma },
-    { label: "Image", description: "Insert image link", value: "![Alt text](url)", offset: 11, icon: ImageIcon },
-
-    // --- Code Snippets ---
-    { label: "Code Block", description: "Generic code snippet", value: "```\n\n```", offset: 4, icon: Code2, shortcut: "code" },
-    { label: "JavaScript", description: "JS code block", value: "```javascript\n\n```", offset: 14, icon: FileCode, shortcut: "js" },
-    { label: "TypeScript", description: "TS code block", value: "```typescript\n\n```", offset: 14, icon: FileCode, shortcut: "ts" },
-    { label: "Python", description: "Python code block", value: "```python\n\n```", offset: 10, icon: FileType, shortcut: "py" },
-    { label: "Java", description: "Java code block", value: "```java\n\n```", offset: 8, icon: Coffee, shortcut: "java" },
-    { label: "React / TSX", description: "React component", value: "```tsx\n\n```", offset: 7, icon: Braces, shortcut: "tsx" },
-    { label: "HTML", description: "HTML structure", value: "```html\n\n```", offset: 8, icon: Code2, shortcut: "html" },
-    { label: "CSS", description: "CSS styles", value: "```css\n\n```", offset: 7, icon: Code2, shortcut: "css" },
-    { label: "JSON", description: "JSON data", value: "```json\n\n```", offset: 8, icon: FileJson, shortcut: "json" },
-    { label: "Markdown", description: "Markdown example", value: "```markdown\n\n```", offset: 12, icon: FileType, shortcut: "md" },
-];
-
 const FONT_OPTIONS = [
-  { label: "Default", value: "inherit" },
-  { label: "Sans Serif", value: "Inter, sans-serif" },
-  { label: "Serif", value: "Merriweather, serif" },
-  { label: "Monospace", value: "'JetBrains Mono', monospace" },
+  { label: "Default (Sans)", value: "Inter, system-ui, sans-serif" },
+  { label: "Serif", value: "Merriweather, Georgia, serif" },
+  { label: "Monospace", value: "'JetBrains Mono', 'Fira Code', monospace" },
+  { label: "Poppins", value: "'Poppins', sans-serif" },
 ];
 
 const FONT_SIZE_OPTIONS = [
-  { label: "Small", value: "14px" },
-  { label: "Normal", value: "16px" },
-  { label: "Medium", value: "18px" },
-  { label: "Large", value: "24px" },
+  { label: "Small", value: "0.875em" },
+  { label: "Normal", value: "1em" },
+  { label: "Medium", value: "1.125em" },
+  { label: "Large", value: "1.5em" },
+  { label: "X-Large", value: "2em" },
 ];
 
-const lightThemes: Record<ColorTheme, ThemeColors> = {
-  light: {
-    appBg: "bg-white",
-    text: "text-slate-900",
-    mutedText: "text-slate-400",
-    border: "border-gray-200",
-    highlight: "bg-indigo-50 text-indigo-700",
-    codeBlockBg: "#f8fafc",
-    proseClass: "prose-slate",
-    menuBg: "bg-white",
-    menuHover: "bg-slate-100",
-  },
-  nord: {
-    appBg: "bg-[#ECEFF4]",
-    text: "text-[#2E3440]",
-    mutedText: "text-[#4C566A]",
-    border: "border-[#D8DEE9]",
-    highlight: "bg-[#88C0D0]/10 text-[#5E81AC]",
-    codeBlockBg: "#E5E9F0",
-    proseClass: "prose-slate",
-    menuBg: "bg-[#E5E9F0]",
-    menuHover: "bg-[#D8DEE9]",
-  },
-  slate: {
-    appBg: "bg-[#fdfbf7]",
-    text: "text-stone-800",
-    mutedText: "text-stone-400",
-    border: "border-stone-200",
-    highlight: "bg-stone-200/50 text-stone-900",
-    codeBlockBg: "#f5f5f4",
-    proseClass: "prose-stone",
-    menuBg: "bg-[#fdfbf7]",
-    menuHover: "bg-stone-100",
-  },
-  ocean: {
-    appBg: "bg-blue-50/30",
-    text: "text-slate-900",
-    mutedText: "text-slate-400",
-    border: "border-blue-100",
-    highlight: "bg-blue-100 text-blue-700",
-    codeBlockBg: "#f0f9ff",
-    proseClass: "prose-blue",
-    menuBg: "bg-white",
-    menuHover: "bg-blue-50",
-  },
-};
-
-const darkThemes: Record<ColorTheme, ThemeColors> = {
-  light: {
-    appBg: "bg-zinc-950",
-    text: "text-zinc-100",
-    mutedText: "text-zinc-500",
-    border: "border-zinc-800",
-    highlight: "bg-indigo-500/20 text-indigo-300",
-    codeBlockBg: "#18181b",
-    proseClass: "prose-invert",
-    menuBg: "bg-zinc-900",
-    menuHover: "bg-zinc-800",
-  },
-  nord: {
-    appBg: "bg-[#2E3440]",
-    text: "text-[#ECEFF4]",
-    mutedText: "text-[#D8DEE9]",
-    border: "border-[#434C5E]",
-    highlight: "bg-[#88C0D0]/20 text-[#88C0D0]",
-    codeBlockBg: "#242933",
-    proseClass: "prose-invert",
-    menuBg: "bg-[#2E3440]",
-    menuHover: "bg-[#3B4252]",
-  },
-  slate: {
-    appBg: "bg-[#1c1917]",
-    text: "text-[#e7e5e4]",
-    mutedText: "text-[#78716c]",
-    border: "border-[#292524]",
-    highlight: "bg-[#44403c] text-[#fafaf9]",
-    codeBlockBg: "#0c0a09",
-    proseClass: "prose-invert",
-    menuBg: "bg-[#1c1917]",
-    menuHover: "bg-[#292524]",
-  },
-  ocean: {
-    appBg: "bg-[#0f172a]",
-    text: "text-[#f1f5f9]",
-    mutedText: "text-[#94a3b8]",
-    border: "border-[#334155]",
-    highlight: "bg-[#38bdf8]/20 text-[#38bdf8]",
-    codeBlockBg: "#020617",
-    proseClass: "prose-invert",
-    menuBg: "bg-[#0f172a]",
-    menuHover: "bg-[#1e293b]",
-  },
-};
-
 // ------------------------------------------------------------------
-// 3. Helper Functions & Components
+// 3. Slash Commands (block-level insertions)
 // ------------------------------------------------------------------
 
-function getCaretCoordinates(element: HTMLTextAreaElement, position: number) {
-    const div = document.createElement('div');
-    const style = window.getComputedStyle(element);
+function insertBlockAtCursor(editor: HTMLDivElement, html: string) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
 
-    Array.from(style).forEach((prop) => {
-        div.style.setProperty(prop, style.getPropertyValue(prop));
-    });
+  const range = sel.getRangeAt(0);
 
-    div.style.position = 'absolute';
-    div.style.visibility = 'hidden';
-    div.style.whiteSpace = 'pre-wrap';
-    div.style.wordWrap = 'break-word';
-    div.style.overflow = 'hidden';
-    div.textContent = element.value.substring(0, position);
-
-    const span = document.createElement('span');
-    span.textContent = '|';
-    div.appendChild(span);
-
-    document.body.appendChild(div);
-    const { offsetLeft, offsetTop } = span;
-    document.body.removeChild(div);
-
-    const rect = element.getBoundingClientRect();
-    return {
-        left: rect.left + offsetLeft - element.scrollLeft,
-        top: rect.top + offsetTop - element.scrollTop
-    };
-}
-
-function extractTextContent(node: ReactNode): string {
-  if (typeof node === "string" || typeof node === "number") {
-    return String(node);
-  }
-  if (Array.isArray(node)) {
-    return node.map(extractTextContent).join("");
-  }
-  if (node && typeof node === "object" && "props" in node) {
-    const element = node as { props: { children?: ReactNode } };
-    return extractTextContent(element.props.children);
-  }
-  return "";
-}
-
-function CopyButton({
-  content,
-  isDarkMode,
-}: {
-  content: string;
-  language?: string;
-  isDarkMode: boolean;
-  theme: ColorTheme;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
+  // Delete the slash trigger text (e.g. "/js")
+  const node = range.startContainer;
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = node.textContent || "";
+    const slashIdx = text.lastIndexOf("/");
+    if (slashIdx !== -1) {
+      (node as Text).deleteData(slashIdx, text.length - slashIdx);
     }
-  };
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className={cn(
-        "absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200",
-        isDarkMode
-          ? "bg-white/10 hover:bg-white/20 text-gray-300"
-          : "bg-black/5 hover:bg-black/10 text-gray-600"
-      )}
-      onClick={handleCopy}
-    >
-      {copied ? (
-        <Check className="h-3.5 w-3.5 text-green-500" />
-      ) : (
-        <Copy className="h-3.5 w-3.5" /> 
-      )}
-    </Button>
-  );
-}
-
-function CodeBlock({
-  children,
-  className,
-  isDarkMode,
-  theme,
-  ...rest
-}: CodeBlockProps & { isDarkMode: boolean; theme: ColorTheme }) {
-  const match = /language-(\w+)/.exec(className || "");
-  const language = match ? match[1] : "";
-  const isInline = !match;
-  
-  const content = extractTextContent(children).replace(/\n$/, "");
-  const colors = isDarkMode ? darkThemes[theme] : lightThemes[theme];
-
-  if (isInline) {
-    return (
-      <code
-        {...rest}
-        className={cn(
-          "px-1.5 py-0.5 rounded-md font-mono text-[0.9em] border font-medium",
-          isDarkMode
-            ? "bg-white/10 border-white/10 text-pink-300"
-            : "bg-slate-100 border-slate-200 text-pink-600"
-        )}
-      >
-        {children}
-      </code>
-    );
   }
 
-  return (
-    <div className="relative group my-6 rounded-lg overflow-hidden border border-transparent shadow-sm">
-      <div className={cn(
-        "flex items-center justify-between px-4 py-2 text-xs font-mono border-b select-none",
-         isDarkMode ? "bg-[#1e1e1e] border-white/10 text-gray-400" : "bg-gray-100 border-gray-200 text-gray-500"
-      )}>
-        <div className="flex items-center gap-2">
-            <Terminal className="w-3 h-3" />
-            <span className="uppercase tracking-wider">{language || "text"}</span>
-        </div>
-      </div>
-      
-      <CopyButton
-        content={content}
-        language={language}
-        isDarkMode={isDarkMode}
-        theme={theme}
-      />
+  // Create and insert the block
+  const temp = document.createElement("div");
+  temp.innerHTML = html;
+  const frag = document.createDocumentFragment();
+  let lastNode: Node | null = null;
+  while (temp.firstChild) {
+    lastNode = frag.appendChild(temp.firstChild);
+  }
+  range.insertNode(frag);
 
-      <SyntaxHighlighter
-        style={isDarkMode ? oneDark : oneLight}
-        language={language || "text"}
-        PreTag="div"
-        customStyle={{
-          margin: 0,
-          borderRadius: 0,
-          background: colors.codeBlockBg,
-          fontSize: "14px",
-          lineHeight: "1.6",
-          padding: "1.5rem",
-        }}
-      >
-        {content}
-      </SyntaxHighlighter>
-    </div>
-  );
+  // Place cursor after inserted content
+  if (lastNode) {
+    const newRange = document.createRange();
+    newRange.setStartAfter(lastNode);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  }
+
+  editor.focus();
+}
+
+const SLASH_COMMANDS: CommandItem[] = [
+  {
+    label: "Heading 1",
+    description: "Big section heading",
+    icon: Heading1,
+    action: (ed) => {
+      document.execCommand("formatBlock", false, "h1");
+      ed.focus();
+    },
+  },
+  {
+    label: "Heading 2",
+    description: "Medium section heading",
+    icon: Heading2,
+    action: (ed) => {
+      document.execCommand("formatBlock", false, "h2");
+      ed.focus();
+    },
+  },
+  {
+    label: "Heading 3",
+    description: "Small section heading",
+    icon: Heading3,
+    action: (ed) => {
+      document.execCommand("formatBlock", false, "h3");
+      ed.focus();
+    },
+  },
+  {
+    label: "Bullet List",
+    description: "Create a simple list",
+    icon: List,
+    action: (ed) => {
+      document.execCommand("insertUnorderedList", false);
+      ed.focus();
+    },
+  },
+  {
+    label: "Numbered List",
+    description: "Create a numbered list",
+    icon: ListOrdered,
+    action: (ed) => {
+      document.execCommand("insertOrderedList", false);
+      ed.focus();
+    },
+  },
+  {
+    label: "To-do List",
+    description: "Track tasks with checkboxes",
+    icon: ListTodo,
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<div class="ps-todo" contenteditable="true"><label><input type="checkbox" /> <span>Task item</span></label></div><p><br></p>`
+      ),
+  },
+  {
+    label: "Quote",
+    description: "Capture a quote",
+    icon: Quote,
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<blockquote class="ps-blockquote"><p>Quote text...</p></blockquote><p><br></p>`
+      ),
+  },
+  {
+    label: "Divider",
+    description: "Insert a horizontal rule",
+    icon: Minus,
+    action: (ed) => {
+      document.execCommand("insertHorizontalRule", false);
+      ed.focus();
+    },
+  },
+  {
+    label: "Table",
+    description: "Insert a table",
+    icon: TableIcon,
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<table class="ps-table"><thead><tr><th>Header</th><th>Header</th></tr></thead><tbody><tr><td>Cell</td><td>Cell</td></tr><tr><td>Cell</td><td>Cell</td></tr></tbody></table><p><br></p>`
+      ),
+  },
+  {
+    label: "Math (KaTeX)",
+    description: "Insert a math equation block",
+    icon: Sigma,
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<div class="ps-math" contenteditable="true" data-placeholder="Enter LaTeX equation...">E = mc^2</div><p><br></p>`
+      ),
+  },
+  {
+    label: "Image",
+    description: "Insert image from URL",
+    icon: ImageIcon,
+    action: (ed) => {
+      const url = prompt("Enter Image URL:");
+      if (url) {
+        insertBlockAtCursor(
+          ed,
+          `<img src="${url}" alt="Image" class="ps-image" /><p><br></p>`
+        );
+      }
+    },
+  },
+  {
+    label: "Code Block",
+    description: "Generic code snippet",
+    icon: Code2,
+    shortcut: "code",
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<pre class="ps-codeblock" data-language="text"><code contenteditable="true">// code here</code></pre><p><br></p>`
+      ),
+  },
+  {
+    label: "JavaScript",
+    description: "JS code block",
+    icon: FileCode,
+    shortcut: "js",
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<pre class="ps-codeblock" data-language="javascript"><code contenteditable="true">// JavaScript</code></pre><p><br></p>`
+      ),
+  },
+  {
+    label: "TypeScript",
+    description: "TS code block",
+    icon: FileCode,
+    shortcut: "ts",
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<pre class="ps-codeblock" data-language="typescript"><code contenteditable="true">// TypeScript</code></pre><p><br></p>`
+      ),
+  },
+  {
+    label: "Python",
+    description: "Python code block",
+    icon: FileType,
+    shortcut: "py",
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<pre class="ps-codeblock" data-language="python"><code contenteditable="true"># Python</code></pre><p><br></p>`
+      ),
+  },
+  {
+    label: "Java",
+    description: "Java code block",
+    icon: Coffee,
+    shortcut: "java",
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<pre class="ps-codeblock" data-language="java"><code contenteditable="true">// Java</code></pre><p><br></p>`
+      ),
+  },
+  {
+    label: "React / TSX",
+    description: "React component",
+    icon: Braces,
+    shortcut: "tsx",
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<pre class="ps-codeblock" data-language="tsx"><code contenteditable="true">// React TSX</code></pre><p><br></p>`
+      ),
+  },
+  {
+    label: "HTML",
+    description: "HTML structure",
+    icon: Code2,
+    shortcut: "html",
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<pre class="ps-codeblock" data-language="html"><code contenteditable="true">&lt;!-- HTML --&gt;</code></pre><p><br></p>`
+      ),
+  },
+  {
+    label: "CSS",
+    description: "CSS styles",
+    icon: Code2,
+    shortcut: "css",
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<pre class="ps-codeblock" data-language="css"><code contenteditable="true">/* CSS */</code></pre><p><br></p>`
+      ),
+  },
+  {
+    label: "JSON",
+    description: "JSON data",
+    icon: FileJson,
+    shortcut: "json",
+    action: (ed) =>
+      insertBlockAtCursor(
+        ed,
+        `<pre class="ps-codeblock" data-language="json"><code contenteditable="true">{}</code></pre><p><br></p>`
+      ),
+  },
+];
+
+// ------------------------------------------------------------------
+// 4. Helpers
+// ------------------------------------------------------------------
+
+/** Convert legacy Markdown content to basic HTML for migration */
+function markdownToBasicHtml(md: string): string {
+  if (!md || !md.trim()) return "<p><br></p>";
+
+  // If it already looks like HTML (has tags) and not raw markdown snippets, return as-is
+  if (/<[a-z][\s\S]*>/i.test(md) && !md.startsWith("#") && !md.startsWith("-") && !md.startsWith("```")) {
+    return md;
+  }
+
+  try {
+    // Configure marked for GF-Markdown including breaks
+    marked.setOptions({
+      breaks: true,
+      gfm: true,
+    });
+    
+    // Parse markdown to HTML string synchronously
+    let html = marked.parse(md) as string;
+
+    // Post-process HTML to inject custom Pagesmith classes for WYSIWYG rendering
+    // 1. Code blocks (marked outputs <pre><code class="language-xyz">)
+    html = html.replace(/<pre><code class="language-([^"]+)">/g, '<pre class="ps-codeblock" data-language="$1"><code>');
+    html = html.replace(/<pre><code>/g, '<pre class="ps-codeblock" data-language="text"><code>');
+    
+    // 2. Blockquotes
+    html = html.replace(/<blockquote>/g, '<blockquote class="ps-blockquote">');
+    
+    // 3. Tables
+    html = html.replace(/<table>/g, '<table class="ps-table">');
+    
+    // 4. Images
+    html = html.replace(/<img /g, '<img class="ps-image" ');
+
+    // Filter out top-level empty wrap spaces
+    if (!html.trim()) return "<p><br></p>";
+    return html;
+  } catch (error) {
+    console.error("Failed to parse markdown:", error);
+    return `<p>${md.replace(/\n/g, '<br>')}</p>`;
+  }
+}
+
+/** Get caret position in viewport coordinates */
+function getCaretRect(): DOMRect | null {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  // For collapsed caret at end of line, rect may be zero-sized
+  if (rect.width === 0 && rect.height === 0) {
+    const span = document.createElement("span");
+    span.textContent = "\u200b"; // zero-width space
+    range.insertNode(span);
+    const spanRect = span.getBoundingClientRect();
+    span.parentNode?.removeChild(span);
+    // Normalize DOM after removing span
+    sel.getRangeAt(0).collapse(true);
+    return spanRect;
+  }
+  return rect;
 }
 
 // ------------------------------------------------------------------
-// 4. Main Component
+// 5. Main Component
 // ------------------------------------------------------------------
 
 export function Editor({ canvasId, initialContent }: EditorProps) {
-  const [content, setContent] = useState(initialContent);
-  const [cursorPosition, setCursorPosition] = useState(0);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [content, setContent] = useState(() =>
+    markdownToBasicHtml(initialContent)
+  );
   const [isExporting, setIsExporting] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [colorTheme, setColorTheme] = useState<ColorTheme>("light");
   const [isDragging, setIsDragging] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Slash Command State
   const [showSlashMenu, setShowSlashMenu] = useState(false);
@@ -418,19 +445,27 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
   const [slashFilter, setSlashFilter] = useState("");
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
+  // Floating Toolbar State
+  const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
+  const [floatingToolbarPos, setFloatingToolbarPos] = useState({
+    top: 0,
+    left: 0,
+  });
+
+  const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { socket, isConnected } = useSocket(canvasId);
 
   const isLocalChange = useRef(false);
+  const isRemoteUpdate = useRef(false);
   const debouncedContent = useDebounce(content, 500);
-  const themeColors = isDarkMode ? darkThemes[colorTheme] : lightThemes[colorTheme];
 
+  // ---- Socket Sync ----
   useEffect(() => {
     if (!socket) return;
     const handleUpdate = (newContent: string) => {
+      isRemoteUpdate.current = true;
       isLocalChange.current = false;
       setContent(newContent);
     };
@@ -440,6 +475,15 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     };
   }, [socket]);
 
+  // Apply remote content updates to the contentEditable div
+  useEffect(() => {
+    if (isRemoteUpdate.current && editorRef.current) {
+      // Save/restore selection is tricky — for remote updates, just set innerHTML
+      editorRef.current.innerHTML = content;
+      isRemoteUpdate.current = false;
+    }
+  }, [content]);
+
   useEffect(() => {
     if (isConnected && socket && isLocalChange.current) {
       socket.emit("canvas-update", { canvasId, content: debouncedContent });
@@ -447,77 +491,275 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     }
   }, [debouncedContent, canvasId, isConnected, socket]);
 
-  // Slash Command Filtering
+  // Initialize editor content on mount
+  useEffect(() => {
+    if (editorRef.current && !editorRef.current.innerHTML.trim()) {
+      editorRef.current.innerHTML = content;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- Enhance code blocks with language badge + copy button ----
+  const enhanceCodeBlocks = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const blocks = editor.querySelectorAll('pre.ps-codeblock');
+    blocks.forEach((block) => {
+      if (block.querySelector('.ps-cb-header')) return; // already enhanced
+      const lang = block.getAttribute('data-language') || 'text';
+      const header = document.createElement('div');
+      header.className = 'ps-cb-header';
+      header.contentEditable = 'false';
+      header.innerHTML = `<span class="ps-cb-lang">${lang.toUpperCase()}</span><button class="ps-cb-copy" title="Copy code">Copy</button>`;
+      block.insertBefore(header, block.firstChild);
+      const copyBtn = header.querySelector('.ps-cb-copy');
+      copyBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const code = block.querySelector('code');
+        const text = code?.textContent || '';
+        navigator.clipboard.writeText(text).then(() => {
+          if (copyBtn) { copyBtn.textContent = 'Copied!'; setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000); }
+        });
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    enhanceCodeBlocks();
+  }, [content, enhanceCodeBlocks]);
+
+  // ---- Fullscreen toggle with Escape key ----
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [isFullscreen]);
+
+  // ---- Slash Command Filtering ----
   const filteredCommands = useMemo(() => {
-      if(!slashFilter) return SLASH_COMMANDS;
-      const lowerFilter = slashFilter.toLowerCase();
-      
-      return SLASH_COMMANDS.filter(cmd => 
-        cmd.label.toLowerCase().includes(lowerFilter) || 
-        cmd.shortcut?.toLowerCase().includes(lowerFilter)
-      );
+    if (!slashFilter) return SLASH_COMMANDS;
+    const lower = slashFilter.toLowerCase();
+    return SLASH_COMMANDS.filter(
+      (cmd) =>
+        cmd.label.toLowerCase().includes(lower) ||
+        cmd.shortcut?.toLowerCase().includes(lower)
+    );
   }, [slashFilter]);
 
-  // Insert HTML util
-  const insertHtmlTag = (prefix: string, suffix: string, blockMode: boolean = false) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const { selectionStart, selectionEnd } = textarea;
-    const selectedText = content.substring(selectionStart, selectionEnd);
-    
-    const pre = blockMode ? `\n\n${prefix}` : prefix;
-    const suf = blockMode ? `${suffix}\n\n` : suffix;
-
-    const newText = pre + selectedText + suf;
-    const newContent =
-      content.substring(0, selectionStart) +
-      newText +
-      content.substring(selectionEnd);
-
-    setContent(newContent);
-    isLocalChange.current = true;
-
-    setTimeout(() => {
-      textarea.focus();
-      if (selectedText) {
-        textarea.selectionStart = selectionStart;
-        textarea.selectionEnd = selectionEnd + pre.length + suf.length;
-      } else {
-        textarea.selectionStart = selectionStart + pre.length;
-        textarea.selectionEnd = selectionStart + pre.length;
-      }
-    }, 0);
-  };
-
-  const executeSlashCommand = (cmd: CommandItem) => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-
-      const { selectionStart } = textarea;
-      
-      const textBeforeCursor = content.substring(0, selectionStart);
-      const lastSlashIndex = textBeforeCursor.lastIndexOf("/");
-      
-      if (lastSlashIndex === -1) return;
-
-      const beforeSlash = content.substring(0, lastSlashIndex);
-      const afterCursor = content.substring(selectionStart);
-      
-      const newContent = beforeSlash + cmd.value + afterCursor;
-
-      setContent(newContent);
+  // ---- Execute slash command ----
+  const executeSlashCommand = useCallback(
+    (cmd: CommandItem) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      cmd.action(editor);
       setShowSlashMenu(false);
       setSlashFilter("");
       isLocalChange.current = true;
-
+      // Sync content after command execution
       setTimeout(() => {
-          textarea.focus();
-          const newPos = lastSlashIndex + cmd.offset;
-          textarea.selectionStart = textarea.selectionEnd = newPos;
-      }, 0);
-  };
+        if (editorRef.current) {
+          setContent(editorRef.current.innerHTML);
+        }
+      }, 10);
+    },
+    []
+  );
 
+  // ---- Detect slash commands in contentEditable ----
+  const checkForSlashCommand = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) {
+      setShowSlashMenu(false);
+      return;
+    }
+
+    const node = sel.anchorNode;
+    if (!node || node.nodeType !== Node.TEXT_NODE) {
+      setShowSlashMenu(false);
+      return;
+    }
+
+    const text = node.textContent || "";
+    const offset = sel.anchorOffset;
+    const textBeforeCursor = text.substring(0, offset);
+
+    const slashIdx = textBeforeCursor.lastIndexOf("/");
+    if (slashIdx === -1) {
+      setShowSlashMenu(false);
+      return;
+    }
+
+    const charBefore = textBeforeCursor[slashIdx - 1];
+    if (charBefore && charBefore !== " " && charBefore !== "\n") {
+      setShowSlashMenu(false);
+      return;
+    }
+
+    const filter = textBeforeCursor.substring(slashIdx + 1);
+    if (filter.includes(" ") || filter.includes("\n")) {
+      setShowSlashMenu(false);
+      return;
+    }
+
+    // Position the menu
+    const caretRect = getCaretRect();
+    if (caretRect) {
+      const editorRect = editorRef.current?.getBoundingClientRect();
+      if (editorRect) {
+        setSlashMenuPos({
+          top: caretRect.bottom - editorRect.top + 8,
+          left: caretRect.left - editorRect.left,
+        });
+      }
+    }
+
+    setSlashFilter(filter);
+    setSlashSelectedIndex(0);
+    setShowSlashMenu(true);
+  }, []);
+
+  // ---- Floating toolbar on selection ----
+  const checkSelection = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+      setShowFloatingToolbar(false);
+      return;
+    }
+
+    // Only show toolbar if selection is inside the editor
+    const editor = editorRef.current;
+    if (
+      !editor ||
+      !editor.contains(sel.anchorNode) ||
+      !editor.contains(sel.focusNode)
+    ) {
+      setShowFloatingToolbar(false);
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const editorRect = editor.getBoundingClientRect();
+
+    setFloatingToolbarPos({
+      top: rect.top - editorRect.top - 52,
+      left: rect.left - editorRect.left + rect.width / 2,
+    });
+    setShowFloatingToolbar(true);
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener("selectionchange", checkSelection);
+    return () =>
+      document.removeEventListener("selectionchange", checkSelection);
+  }, [checkSelection]);
+
+  // ---- Editor input handler ----
+  const handleInput = useCallback(() => {
+    if (!editorRef.current) return;
+    const html = editorRef.current.innerHTML;
+    setContent(html);
+    isLocalChange.current = true;
+    checkForSlashCommand();
+  }, [checkForSlashCommand]);
+
+  // ---- Keyboard handling ----
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (showSlashMenu) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSlashSelectedIndex(
+            (prev) => (prev + 1) % filteredCommands.length
+          );
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSlashSelectedIndex(
+            (prev) =>
+              (prev - 1 + filteredCommands.length) % filteredCommands.length
+          );
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (filteredCommands[slashSelectedIndex]) {
+            executeSlashCommand(filteredCommands[slashSelectedIndex]);
+          }
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setShowSlashMenu(false);
+          return;
+        }
+      }
+
+      // Tab indentation
+      if (e.key === "Tab") {
+        e.preventDefault();
+        document.execCommand("insertText", false, "  ");
+        return;
+      }
+
+      // Keyboard shortcuts
+      if (e.metaKey || e.ctrlKey) {
+        switch (e.key) {
+          case "b":
+            e.preventDefault();
+            document.execCommand("bold", false);
+            break;
+          case "i":
+            e.preventDefault();
+            document.execCommand("italic", false);
+            break;
+          case "u":
+            e.preventDefault();
+            document.execCommand("underline", false);
+            break;
+          case "k":
+            e.preventDefault();
+            {
+              const url = prompt("Enter URL:");
+              if (url) {
+                document.execCommand("createLink", false, url);
+              }
+            }
+            break;
+        }
+      }
+    },
+    [
+      showSlashMenu,
+      filteredCommands,
+      slashSelectedIndex,
+      executeSlashCommand,
+    ]
+  );
+
+  // ---- Paste handling for Markdown (e.g. from AI) ----
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    if (!text) return;
+    
+    // Parse the raw markdown into HTML
+    const html = markdownToBasicHtml(text);
+    
+    // Insert the parsed HTML
+    document.execCommand("insertHTML", false, html);
+    
+    if (editorRef.current) {
+      setContent(editorRef.current.innerHTML);
+      isLocalChange.current = true;
+    }
+  }, []);
+
+  // ---- Drag and Drop ----
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -544,294 +786,163 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     if (files.length === 0) return;
 
     const file = files[0];
-    const textarea = textareaRef.current;
-    
-    let insertPos = textarea ? textarea.selectionStart : content.length;
-    if (!isEditMode) setIsEditMode(true);
+    const editor = editorRef.current;
+    if (!editor) return;
 
-    setTimeout(async () => {
-        const currentTextarea = textareaRef.current;
-        if (currentTextarea) {
-            insertPos = currentTextarea.selectionStart;
-        }
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        const imgHtml = `<img src="${base64}" alt="${file.name}" class="ps-image" />`;
+        editor.focus();
+        document.execCommand("insertHTML", false, imgHtml);
+        setContent(editor.innerHTML);
+        isLocalChange.current = true;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        const codeExts = [
+          "js",
+          "ts",
+          "py",
+          "java",
+          "c",
+          "cpp",
+          "json",
+          "html",
+          "css",
+        ];
+        let insertHtml: string;
 
-        if (file.type.startsWith("image/")) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const base64 = event.target?.result as string;
-                const imageMarkdown = `\n![${file.name}](${base64})\n`;
-                insertTextAtPosition(imageMarkdown, insertPos);
-            };
-            reader.readAsDataURL(file);
+        if (codeExts.includes(ext || "")) {
+          const escaped = text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+          insertHtml = `<pre class="ps-codeblock" data-language="${ext}"><code>${escaped}</code></pre><p><br></p>`;
         } else {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const text = event.target?.result as string;
-                const fileExtension = file.name.split('.').pop()?.toLowerCase();
-                let importedContent = text;
-                
-                const codeExtensions = ['js', 'ts', 'py', 'java', 'c', 'cpp', 'json', 'html', 'css'];
-                if (codeExtensions.includes(fileExtension || '')) {
-                      importedContent = `\n\`\`\`${fileExtension}\n${text}\n\`\`\`\n`;
-                } else {
-                      importedContent = `\n${text}\n`;
-                }
+          insertHtml = `<p>${text.replace(/\n/g, "<br>")}</p>`;
+        }
 
-                insertTextAtPosition(importedContent, insertPos);
-            };
-            reader.readAsText(file);
-        }
-    }, 50);
-  };
-
-  const insertTextAtPosition = (text: string, position: number) => {
-      const before = content.substring(0, position);
-      const after = content.substring(position);
-      const newContent = before + text + after;
-      setContent(newContent);
-      isLocalChange.current = true;
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const textarea = e.currentTarget;
-    const { selectionStart, selectionEnd } = textarea;
-
-    if (showSlashMenu) {
-        if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setSlashSelectedIndex((prev) => (prev + 1) % filteredCommands.length);
-            return;
-        }
-        if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setSlashSelectedIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
-            return;
-        }
-        if (e.key === "Enter") {
-            e.preventDefault();
-            if (filteredCommands[slashSelectedIndex]) {
-                executeSlashCommand(filteredCommands[slashSelectedIndex]);
-            }
-            return;
-        }
-        if (e.key === "Escape") {
-            e.preventDefault();
-            setShowSlashMenu(false);
-            return;
-        }
+        editor.focus();
+        document.execCommand("insertHTML", false, insertHtml);
+        setContent(editor.innerHTML);
+        isLocalChange.current = true;
+      };
+      reader.readAsText(file);
     }
+  };
 
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const beforeCursor = content.substring(0, selectionStart);
-      const afterCursor = content.substring(selectionEnd);
-      const newContent = beforeCursor + "  " + afterCursor;
-      setContent(newContent);
-      isLocalChange.current = true;
+  // ---- File import ----
+  const handleImportFile = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const editor = editorRef.current;
+    if (!editor) return;
 
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = selectionStart + 2;
-      }, 0);
+    const validExts = [
+      "txt",
+      "md",
+      "markdown",
+      "js",
+      "jsx",
+      "ts",
+      "tsx",
+      "py",
+      "java",
+      "cpp",
+      "c",
+      "h",
+      "rs",
+      "go",
+      "yml",
+      "yaml",
+      "json",
+      "xml",
+      "html",
+      "css",
+      "scss",
+    ];
+
+    if (!validExts.includes(ext || "")) {
+      alert("Unsupported file type.");
       return;
     }
 
-    if (e.key === "Enter" && !showSlashMenu) {
-      const beforeCursor = content.substring(0, selectionStart);
-      const lines = beforeCursor.split("\n");
-      const currentLine = lines[lines.length - 1];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (!text) return;
 
-      if (currentLine.match(/^\s*[\*\-\+]\s/)) {
-        e.preventDefault();
-        const match = currentLine.match(/^(\s*)([\*\-\+]\s)/);
-        if (match) {
-          const indent = match[1];
-          const bullet = match[2];
-          const textAfterBullet = currentLine.replace(match[0], "").trim();
-          
-          if (!textAfterBullet) {
-             const newContent = content.substring(0, selectionStart - bullet.length - indent.length) + "\n" + content.substring(selectionEnd);
-             setContent(newContent);
-             return;
-          }
-
-          insertText(`\n${indent}${bullet}`);
-        }
-        return;
-      }
-
-      if (currentLine.match(/^\s*\d+\.\s/)) {
-        e.preventDefault();
-        const match = currentLine.match(/^(\s*)(\d+)(\.\s)/);
-        if (match) {
-          const indent = match[1];
-          const nextNum = parseInt(match[2]) + 1;
-          const textAfterNum = currentLine.replace(match[0], "").trim();
-
-           if (!textAfterNum) {
-             const newContent = content.substring(0, selectionStart - match[0].length) + "\n" + content.substring(selectionEnd);
-             setContent(newContent);
-             return;
-          }
-
-          insertText(`\n${indent}${nextNum}. `);
-        }
-        return;
-      }
-    }
-
-    if (e.metaKey || e.ctrlKey) {
-      switch (e.key) {
-        case "b":
-          e.preventDefault();
-          wrapSelection("**", "**");
-          break;
-        case "i":
-          e.preventDefault();
-          wrapSelection("*", "*");
-          break;
-        case "k":
-          e.preventDefault();
-          wrapSelection("[", "](url)");
-          break;
-      }
-    }
-  };
-
-  const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
-    const textarea = e.currentTarget;
-    const newValue = textarea.value;
-    const { selectionStart } = textarea;
-
-    const beforeCursor = newValue.substring(0, selectionStart);
-    const lastSlash = beforeCursor.lastIndexOf("/");
-    
-    if (lastSlash !== -1) {
-        const textAfterSlash = beforeCursor.substring(lastSlash + 1);
-        const charBeforeSlash = beforeCursor[lastSlash - 1];
-        
-        if (
-            (!charBeforeSlash || charBeforeSlash === " " || charBeforeSlash === "\n") && 
-            !textAfterSlash.includes(" ") &&
-            !textAfterSlash.includes("\n")
-        ) {
-             if (!showSlashMenu) {
-                 const coords = getCaretCoordinates(textarea, selectionStart);
-                 setSlashMenuPos({ top: coords.top + 24, left: coords.left });
-                 setShowSlashMenu(true);
-             }
-             setSlashFilter(textAfterSlash);
-             setSlashSelectedIndex(0);
-        } else {
-            setShowSlashMenu(false);
-        }
-    } else {
-        setShowSlashMenu(false);
-    }
-
-    setContent(newValue);
-    isLocalChange.current = true;
-  };
-
-  const insertText = (text: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const { selectionStart, selectionEnd } = textarea;
-    const newContent =
-      content.substring(0, selectionStart) +
-      text +
-      content.substring(selectionEnd);
-    setContent(newContent);
-    isLocalChange.current = true;
-
-    setTimeout(() => {
-      textarea.selectionStart = textarea.selectionEnd =
-        selectionStart + text.length;
-      textarea.focus();
-    }, 0);
-  };
-
-  const wrapSelection = (before: string, after: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const { selectionStart, selectionEnd } = textarea;
-    const selectedText = content.substring(selectionStart, selectionEnd);
-    const newText = before + selectedText + after;
-    const newContent =
-      content.substring(0, selectionStart) +
-      newText +
-      content.substring(selectionEnd);
-
-    setContent(newContent);
-    isLocalChange.current = true;
-
-    setTimeout(() => {
-      if (selectedText) {
-        textarea.selectionStart = selectionStart;
-        textarea.selectionEnd = selectionEnd + before.length + after.length;
+      let insertHtml: string;
+      if (["txt", "md", "markdown"].includes(ext || "")) {
+        insertHtml = markdownToBasicHtml(text);
       } else {
-        textarea.selectionStart = textarea.selectionEnd =
-          selectionStart + before.length;
+        const escaped = text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        insertHtml = `<pre class="ps-codeblock" data-language="${ext}"><code>${escaped}</code></pre>`;
       }
-      textarea.focus();
-    }, 0);
+
+      editor.focus();
+      document.execCommand("insertHTML", false, insertHtml);
+      setContent(editor.innerHTML);
+      isLocalChange.current = true;
+    };
+    reader.readAsText(file);
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const getPlaceholderText = () => {
-    if (!content.trim()) {
-      return `Type '/' for commands...`;
-    }
-    return "Continue writing...";
-  };
-
+  // ---- Export to PDF ----
   const exportToPDF = async () => {
-    if (!previewRef.current) return;
+    const editor = editorRef.current;
+    if (!editor) return;
     setIsExporting(true);
     try {
-      const clonedContent = previewRef.current.cloneNode(true) as HTMLElement;
-      const buttons = clonedContent.querySelectorAll("button");
+      const cloned = editor.cloneNode(true) as HTMLElement;
+      const buttons = cloned.querySelectorAll("button");
       buttons.forEach((btn) => btn.remove());
 
-      const allElements = clonedContent.querySelectorAll("*");
-      allElements.forEach((element) => {
-        const htmlElement = element as HTMLElement;
-        const computedStyle = window.getComputedStyle(htmlElement);
-        if (computedStyle.color) htmlElement.style.color = computedStyle.color;
-        if (computedStyle.backgroundColor) htmlElement.style.backgroundColor = computedStyle.backgroundColor;
-        if (computedStyle.fontFamily) htmlElement.style.fontFamily = computedStyle.fontFamily;
-      });
-
-      const previewContent = clonedContent.innerHTML;
       const printWindow = window.open("", "_blank");
-      
       if (!printWindow) throw new Error("Please allow pop-ups to export PDF");
-      
+
       const htmlContent = `
         <!DOCTYPE html>
         <html>
           <head>
             <meta charset="utf-8">
-            <title>${canvasId || 'Document'}</title>
+            <title>${canvasId || "Document"}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@300;400;700&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.css">
             <style>
-              body { font-family: -apple-system, sans-serif; line-height: 1.6; padding: 40px; max-width: 800px; margin: 0 auto; color: #1a1a1a; }
-              img { max-width: 100%; }
-              pre { background: #f5f5f5; padding: 15px; border-radius: 5px; }
-              code { font-family: monospace; background: #f5f5f5; padding: 2px 5px; border-radius: 3px; }
-              blockquote { border-left: 4px solid #ddd; padding-left: 15px; color: #666; }
+              body { font-family: 'Inter', sans-serif; line-height: 1.7; padding: 40px; max-width: 800px; margin: 0 auto; color: #1a1a1a; }
+              img { max-width: 100%; border-radius: 8px; }
+              pre { background: #f5f5f5; padding: 16px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; overflow-x: auto; }
+              code { font-family: 'JetBrains Mono', monospace; }
+              blockquote { border-left: 3px solid #6366f1; padding-left: 16px; color: #666; font-style: italic; }
               table { width: 100%; border-collapse: collapse; margin: 20px 0; }
               th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+              th { background: #f8f8f8; font-weight: 600; }
+              h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
+              hr { border: none; border-top: 2px solid #e5e7eb; margin: 24px 0; }
               @media print { body { padding: 0; } }
             </style>
           </head>
-          <body>${previewContent}</body>
+          <body>${cloned.innerHTML}</body>
         </html>
       `;
 
       printWindow.document.write(htmlContent);
       printWindow.document.close();
-
       printWindow.onload = () => {
         setTimeout(() => {
           printWindow.print();
@@ -845,197 +956,15 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
     }
   };
 
-  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const fileName = file.name;
-    const fileExtension = fileName.split('.').pop()?.toLowerCase();
-
-    try {
-      let importedContent = "";
-
-      if (fileExtension === 'pdf') {
-        alert("PDF import requires pdf.js library.");
-        return;
-      }
-
-      const validExtensions = ['txt', 'md', 'markdown', 'js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'rs', 'go', 'yml', 'yaml', 'json', 'xml', 'html', 'css', 'scss'];
-      
-      if (validExtensions.includes(fileExtension || '')) {
-        const reader = new FileReader();
-        
-        reader.onload = (e) => {
-          const text = e.target?.result as string;
-          if (text) {
-             const textarea = textareaRef.current;
-            if (!textarea) {
-              setContent(text);
-              isLocalChange.current = true;
-              return;
-            }
-            if (['txt', 'md', 'markdown'].includes(fileExtension || '')) {
-                 importedContent = `\n\n${text}\n\n`;
-            } else {
-                 importedContent = `\n\n\`\`\`${fileExtension}\n${text}\n\`\`\`\n\n`;
-            }
-
-            const { selectionStart } = textarea;
-            const beforeCursor = content.substring(0, selectionStart);
-            const afterCursor = content.substring(selectionStart);
-            const newContent = beforeCursor + importedContent + afterCursor;
-            
-            setContent(newContent);
-            isLocalChange.current = true;
-          }
-        };
-        reader.readAsText(file);
-      } else {
-        alert(`Unsupported file type.`);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const triggerFileImport = () => {
-    fileInputRef.current?.click();
-  };
-
-  const FormattingToolbar = () => (
-    <div className={cn(
-        "sticky top-0 z-10 flex flex-wrap items-center gap-1.5 p-2 border-b backdrop-blur-md transition-colors duration-300",
-        isDarkMode 
-            ? "bg-black/60 border-white/5" 
-            : "bg-white/80 border-gray-100"
-    )}>
-        {/* Alignment */}
-        <div className="flex items-center rounded-lg overflow-hidden bg-transparent p-0.5 gap-0.5">
-            {[
-                { icon: AlignLeft, action: () => insertHtmlTag('<div style="text-align: left">', '</div>', true) },
-                { icon: AlignCenter, action: () => insertHtmlTag('<div style="text-align: center">', '</div>', true) },
-                { icon: AlignRight, action: () => insertHtmlTag('<div style="text-align: right">', '</div>', true) },
-                { icon: AlignJustify, action: () => insertHtmlTag('<div style="text-align: justify">', '</div>', true) },
-            ].map((tool, i) => (
-                <Button key={i} variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={tool.action}>
-                    <tool.icon className={cn("h-3.5 w-3.5", themeColors.mutedText)} />
-                </Button>
-            ))}
-        </div>
-
-        <div className={cn("h-4 w-[1px] mx-1", themeColors.border)} />
-
-        {/* Font Family */}
-        <Select onValueChange={(value) => insertHtmlTag(`<span style="font-family: ${value}">`, '</span>')}>
-            <SelectTrigger className="h-7 w-[110px] text-xs border-0 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:ring-0">
-                <SelectValue placeholder="Font" />
-            </SelectTrigger>
-            <SelectContent>
-                {FONT_OPTIONS.map((font) => (
-                    <SelectItem key={font.value} value={font.value} style={{ fontFamily: font.value }}>
-                        {font.label}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-
-        {/* Font Size */}
-        <Select onValueChange={(value) => insertHtmlTag(`<span style="font-size: ${value}">`, '</span>')}>
-            <SelectTrigger className="h-7 w-[90px] text-xs border-0 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 focus:ring-0">
-                <SelectValue placeholder="Size" />
-            </SelectTrigger>
-            <SelectContent>
-                {FONT_SIZE_OPTIONS.map((size) => (
-                    <SelectItem key={size.value} value={size.value}>
-                        {size.label}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-
-        <div className={cn("h-4 w-[1px] mx-1", themeColors.border)} />
-
-        {/* Colors */}
-        <div className="flex items-center gap-1">
-             <div className="relative group">
-                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => document.getElementById("text-color-picker")?.click()}>
-                    <Baseline className={cn("h-3.5 w-3.5", themeColors.mutedText)} />
-                </Button>
-                <input type="color" id="text-color-picker" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={(e) => insertHtmlTag(`<span style="color: ${e.target.value}">`, '</span>')} />
-             </div>
-             <div className="relative group">
-                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => document.getElementById("bg-color-picker")?.click()}>
-                    <Highlighter className={cn("h-3.5 w-3.5", themeColors.mutedText)} />
-                </Button>
-                <input type="color" id="bg-color-picker" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={(e) => insertHtmlTag(`<span style="background-color: ${e.target.value}">`, '</span>')} />
-             </div>
-        </div>
-
-         <div className={cn("h-4 w-[1px] mx-1", themeColors.border)} />
-
-        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm" onClick={() => insertHtmlTag('\n$$\n', '\n$$\n', false)}>
-            <Sigma className={cn("h-3.5 w-3.5", themeColors.mutedText)} />
-        </Button>
-    </div>
-  );
-
-  const PreviewContent = () => (
-    <article
-      ref={previewRef}
-      onDoubleClick={() => setIsEditMode(true)}
-      className={cn(
-        "prose max-w-none p-8 sm:p-12 transition-all duration-300",
-        "prose-headings:font-semibold prose-headings:tracking-tight",
-        "prose-p:leading-relaxed prose-li:my-1",
-        "prose-pre:bg-transparent prose-pre:p-0 prose-pre:m-0", 
-        themeColors.proseClass,
-        "cursor-text min-h-[500px]"
-      )}
-    >
-      {content.trim() ? (
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={[rehypeKatex, rehypeRaw]}
-          components={{
-            code: (props) => (
-              <CodeBlock {...props} isDarkMode={isDarkMode} theme={colorTheme} />
-            ),
-            blockquote: (props) => (
-                <div className="relative group my-6 pl-4 border-l-2 border-indigo-500/50 italic opacity-80">
-                   {props.children}
-                </div>
-            ),
-            table: (props) => (
-                <div className="overflow-x-auto my-6 rounded-lg border border-opacity-50">
-                    <table className="w-full text-sm text-left">
-                        {props.children}
-                    </table>
-                </div>
-            ),
-            th: ({children}) => <th className="px-6 py-3 bg-gray-50 dark:bg-white/5 font-medium uppercase tracking-wider text-xs">{children}</th>,
-            td: ({children}) => <td className="px-6 py-4 border-t border-gray-100 dark:border-white/5">{children}</td>
-          }}
-        >
-          {content}
-        </ReactMarkdown>
-      ) : (
-        <div className="flex flex-col items-center justify-center h-64 opacity-40">
-           <Edit3 className="w-12 h-12 mb-4" strokeWidth={1.5} />
-           <p className="text-sm font-medium">Start writing to preview content...</p>
-        </div>
-      )}
-    </article>
-  );
-
+  // ---- Rendering ----
   return (
     <div
       className={cn(
-        "flex flex-col h-screen w-full relative transition-colors duration-500 overflow-hidden",
-        themeColors.appBg
+        "flex flex-col w-full relative transition-colors duration-500 overflow-hidden",
+        "bg-white dark:bg-black",
+        isFullscreen
+          ? "fixed inset-0 z-[9999] h-screen"
+          : "h-full"
       )}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -1050,168 +979,367 @@ export function Editor({ canvasId, initialContent }: EditorProps) {
         className="hidden"
       />
 
-      <header className={cn(
-          "flex-none px-6 py-3 flex items-center justify-between border-b sticky top-0 z-50 backdrop-blur-xl",
-          isDarkMode ? "bg-black/40 border-white/5" : "bg-white/60 border-gray-200/50"
-      )}>
-          <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                 <div className={cn("w-2.5 h-2.5 rounded-full animate-pulse", isConnected ? "bg-emerald-500" : "bg-rose-500")} />
-                 <span className={cn("text-xs font-medium uppercase tracking-widest opacity-60", themeColors.text)}>
-                    {isConnected ? "Live" : "Offline"}
-                 </span>
+      {/* ====== HEADER / TOOLBAR ====== */}
+      <header
+        className={cn(
+          "flex-none flex items-center justify-between px-3 sm:px-6 py-2.5 border-b bg-white dark:bg-black border-slate-200 dark:border-white/10 z-20 sticky top-0 backdrop-blur-xl transition-colors",
+          isFullscreen ? "fixed top-0 left-0 right-0 bg-white/80 dark:bg-black/80 shadow-sm" : ""
+        )}
+      >
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap flex-1 min-w-0">
+          {/* Quick formatting buttons */}
+          <div className="flex items-center gap-0.5 mr-1 flex-shrink-0 bg-slate-100 dark:bg-white/5 rounded-md p-1 border border-slate-200 dark:border-white/10">
+            {[
+              { icon: Bold, action: () => document.execCommand("bold"), title: "Bold" },
+              { icon: Italic, action: () => document.execCommand("italic"), title: "Italic" },
+              { icon: Underline, action: () => document.execCommand("underline"), title: "Underline" },
+              {
+                icon: Link,
+                title: "Link",
+                action: () => {
+                  const url = prompt("Enter URL:");
+                  if (url) document.execCommand("createLink", false, url);
+                },
+              },
+            ].map((tool, i) => (
+              <Button
+                key={i} variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors" title={tool.title}
+                onClick={(e) => { e.preventDefault(); editorRef.current?.focus(); tool.action(); setTimeout(() => { if (editorRef.current) { setContent(editorRef.current.innerHTML); isLocalChange.current = true; } }, 0); }}
+              >
+                <tool.icon className="h-3.5 w-3.5" />
+              </Button>
+            ))}
+          </div>
+
+          <div className="h-5 w-[1px] bg-slate-200 dark:bg-white/20 mx-1 flex-shrink-0" />
+
+          {/* More Tools Dropdown for responsiveness */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
+                <span className="hidden sm:inline">More</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[200px] z-50 bg-white dark:bg-neutral-900 border-slate-200 dark:border-white/10 shadow-xl rounded-xl">
+              <div className="px-3 py-2 text-[10px] font-bold text-slate-400 tracking-wider uppercase">Alignment</div>
+              <div className="flex px-2 gap-1 mb-2">
+                {[
+                  { icon: AlignLeft, action: () => document.execCommand("justifyLeft") },
+                  { icon: AlignCenter, action: () => document.execCommand("justifyCenter") },
+                  { icon: AlignRight, action: () => document.execCommand("justifyRight") },
+                  { icon: AlignJustify, action: () => document.execCommand("justifyFull") },
+                ].map((tool, i) => (
+                  <Button key={i} variant="ghost" size="icon" className="h-8 w-8 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10" onClick={() => { editorRef.current?.focus(); tool.action(); }}>
+                    <tool.icon className="h-4 w-4" />
+                  </Button>
+                ))}
               </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground">
-                   <Palette className="h-4 w-4" />
-                   <span className="text-xs">Theme</span>
+              <div className="px-3 py-2 text-[10px] font-bold text-slate-400 tracking-wider uppercase border-t border-slate-100 dark:border-white/5">Typography</div>
+              <div className="px-2 mb-1">
+                <Select onValueChange={(value) => { editorRef.current?.focus(); document.execCommand("fontName", false, value); }}>
+                  <SelectTrigger className="w-full h-8 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/50 focus:ring-0 text-xs rounded-md">
+                    <SelectValue placeholder="Font Family" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_OPTIONS.map((font) => (
+                      <SelectItem key={font.value} value={font.value} style={{ fontFamily: font.value }} className="text-xs">{font.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="px-2 mb-2">
+                <Select onValueChange={(value) => {
+                  editorRef.current?.focus();
+                  document.execCommand("fontSize", false, "7");
+                  setTimeout(() => {
+                    if (editorRef.current) {
+                      const fonts = editorRef.current.querySelectorAll('font[size="7"]');
+                      fonts.forEach((el) => { (el as HTMLElement).removeAttribute("size"); (el as HTMLElement).style.fontSize = value; });
+                      setContent(editorRef.current.innerHTML);
+                      isLocalChange.current = true;
+                    }
+                  }, 0);
+                }}>
+                  <SelectTrigger className="w-full h-8 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/50 focus:ring-0 text-xs rounded-md">
+                    <SelectValue placeholder="Font Size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_SIZE_OPTIONS.map((size) => (
+                      <SelectItem key={size.value} value={size.value} className="text-xs">{size.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="px-3 py-2 text-[10px] font-bold text-slate-400 tracking-wider uppercase border-t border-slate-100 dark:border-white/5">Colors</div>
+              <div className="flex gap-2 px-2 py-1 mb-2">
+                <Button variant="outline" size="sm" className="w-full text-[11px] h-8 border-slate-200 dark:border-white/10 dark:hover:bg-white/10" onClick={() => document.getElementById("ps-text-color")?.click()}>
+                  <Type className="h-3.5 w-3.5 mr-1" /> Text
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                  {(["light", "nord", "slate", "ocean"] as ColorTheme[]).map((t) => (
-                      <DropdownMenuItem key={t} onClick={() => setColorTheme(t)} className="capitalize">
-                          {t}
-                      </DropdownMenuItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <Button variant="outline" size="sm" className="w-full text-[11px] h-8 border-slate-200 dark:border-white/10 dark:hover:bg-white/10" onClick={() => document.getElementById("ps-bg-color")?.click()}>
+                  <Sigma className="h-3.5 w-3.5 mr-1" /> BG
+                </Button>
+              </div>
 
-            <Button variant="ghost" size="icon" onClick={() => setIsDarkMode(!isDarkMode)} className="h-8 w-8 text-muted-foreground">
-              {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
+              <div className="px-3 py-2 text-[10px] font-bold text-slate-400 tracking-wider uppercase border-t border-slate-100 dark:border-white/5">Actions</div>
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="text-[11px] font-medium cursor-pointer mx-1 mb-1 rounded-md focus:bg-slate-100 dark:focus:bg-white/10">
+                <Upload className="h-3.5 w-3.5 mr-2 opacity-70" /> Import Markdown
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToPDF} disabled={isExporting} className="text-[11px] font-medium cursor-pointer mx-1 mb-1 rounded-md focus:bg-slate-100 dark:focus:bg-white/10">
+                <Download className="h-3.5 w-3.5 mr-2 opacity-70" /> {isExporting ? "Exporting..." : "Export to PDF"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-            <div className={cn("h-4 w-[1px] opacity-20 mx-1", isDarkMode ? "bg-white" : "bg-black")} />
+          <input type="color" id="ps-text-color" className="hidden" onChange={(e) => { editorRef.current?.focus(); document.execCommand("foreColor", false, e.target.value); }} />
+          <input type="color" id="ps-bg-color" className="hidden" onChange={(e) => { editorRef.current?.focus(); document.execCommand("hiliteColor", false, e.target.value); }} />
+        </div>
 
-            <Button variant="ghost" size="sm" onClick={triggerFileImport} className="h-8 text-muted-foreground">
-              <Upload className="h-4 w-4 mr-2" />
-              Import
-            </Button>
-
-             <Button variant="ghost" size="sm" onClick={exportToPDF} disabled={isExporting} className="h-8 text-muted-foreground">
-              <Download className="h-4 w-4 mr-2" />
-              {isExporting ? "..." : "Export"}
-            </Button>
-
-            <Button
-              onClick={() => setIsEditMode(!isEditMode)}
-              size="sm"
-              className={cn(
-                "ml-2 h-8 px-4 transition-all shadow-sm font-medium",
-                isDarkMode 
-                    ? "bg-white text-black hover:bg-gray-200" 
-                    : "bg-black text-white hover:bg-gray-800"
-              )}
-            >
-              {isEditMode ? (
-                <>
-                  <Eye className="h-3.5 w-3.5 mr-2" /> Preview
-                </>
-              ) : (
-                <>
-                  <Edit3 className="h-3.5 w-3.5 mr-2" /> Edit
-                </>
-              )}
-            </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+            <div className={cn("w-2 h-2 rounded-full animate-pulse", isConnected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "bg-rose-500")} />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+              {isConnected ? "Live" : "Offline"}
+            </span>
           </div>
+
+          <div className="h-5 w-[1px] bg-slate-200 dark:bg-white/20 mx-1 flex-shrink-0" />
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="h-9 w-9 text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-white/10 rounded-lg transition-colors"
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
+        </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
-         <div className={cn(
-             "flex-1 w-full h-full transition-all duration-500 ease-out",
-             themeColors.appBg,
-             themeColors.text
-         )}>
-            {isEditMode ? (
-              <div className="flex flex-col min-h-full relative">
-                <FormattingToolbar />
-                
-                <div className="relative flex-1 group">
-                  <Textarea
-                    ref={textareaRef}
-                    value={content}
-                    onChange={() => {}}
-                    onInput={handleInput}
-                    onKeyDown={handleKeyDown}
-                    onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
-                    className={cn(
-                      "w-full h-full min-h-[calc(100vh-140px)] p-8 sm:p-12 resize-none bg-transparent border-0 focus-visible:ring-0 font-mono text-base leading-7 selection:bg-indigo-500/20",
-                      themeColors.text,
-                      "placeholder:opacity-30 outline-none"
-                    )}
-                    spellCheck={false}
-                    placeholder=""
-                  />
-                   {!content.trim() && (
-                    <div className={cn(
-                        "absolute top-12 left-12 pointer-events-none opacity-40 font-mono text-sm",
-                         themeColors.mutedText
-                    )}>
-                        {getPlaceholderText()}
-                    </div>
-                  )}
+      {/* ====== MAIN EDITOR CANVAS ====== */}
+      <main
+        className={cn(
+          "flex-1 overflow-y-auto relative scroll-smooth no-scrollbar",
+          "bg-white dark:bg-black text-slate-900 dark:text-slate-100"
+        )}
+      >
+        {/* Drag overlay */}
+        {isDragging && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-indigo-500/10 backdrop-blur-sm border-2 border-dashed border-indigo-400 rounded-lg m-4 pointer-events-none">
+            <div className="text-center">
+              <Upload className="h-12 w-12 mx-auto mb-3 text-indigo-500 animate-bounce" />
+              <p className="text-lg font-semibold text-indigo-600 dark:text-indigo-400">
+                Drop file to import
+              </p>
+            </div>
+          </div>
+        )}
 
-                  {showSlashMenu && (
-                      <div 
-                        className={cn(
-                            "absolute z-50 w-72 rounded-lg shadow-2xl overflow-hidden border animate-in fade-in zoom-in-95 duration-100",
-                            themeColors.menuBg,
-                            themeColors.border
-                        )}
-                        style={{
-                            top: slashMenuPos.top,
-                            left: slashMenuPos.left
-                        }}
-                      >
-                         <div className="px-3 py-2 text-xs font-semibold opacity-50 uppercase tracking-wider border-b">
-                            Block / Command
-                         </div>
-                         <div className="max-h-[300px] overflow-y-auto py-1">
-                             {filteredCommands.length > 0 ? (
-                                 filteredCommands.map((cmd, index) => (
-                                     <button
-                                        key={cmd.label}
-                                        onClick={() => executeSlashCommand(cmd)}
-                                        className={cn(
-                                            "w-full px-3 py-2 text-left flex items-center gap-3 transition-colors",
-                                            index === slashSelectedIndex ? themeColors.menuHover : "bg-transparent",
-                                            themeColors.text
-                                        )}
-                                     >
-                                         <div className="p-1 rounded border opacity-70">
-                                            <cmd.icon className="w-4 h-4" />
-                                         </div>
-                                         <div className="flex flex-col">
-                                             <div className="flex items-center gap-2">
-                                                 <span className="text-sm font-medium">{cmd.label}</span>
-                                                 {cmd.shortcut && slashFilter && (
-                                                     <span className="text-[10px] uppercase bg-indigo-500/20 px-1 rounded text-indigo-500">
-                                                        /{cmd.shortcut}
-                                                     </span>
-                                                 )}
-                                             </div>
-                                             <span className="text-xs opacity-50">{cmd.description}</span>
-                                         </div>
-                                     </button>
-                                 ))
-                             ) : (
-                                 <div className="px-4 py-3 text-sm opacity-50 text-center">
-                                     No commands found
-                                 </div>
-                             )}
-                         </div>
-                      </div>
-                  )}
-
-                </div>
-              </div>
-            ) : (
-              <PreviewContent />
+        {/* ContentEditable Editor */}
+        <div className="relative w-full min-h-full">
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            data-placeholder="Start typing or press '/' for commands..."
+            className={cn(
+              "ps-editor outline-none w-full min-h-[calc(100vh-64px)] px-6 sm:px-12 md:px-20 py-8 sm:py-12",
+              "selection:bg-indigo-500/20 text-slate-900 dark:text-slate-100",
+              "[&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-slate-400 [&:empty]:before:pointer-events-none [&:empty]:before:block"
             )}
-         </div>
+            style={{
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              lineHeight: "1.8",
+              fontSize: "16px",
+              fontFamily: "'Inter', system-ui, sans-serif",
+            }}
+          />
+
+          {/* ====== FLOATING TOOLBAR (on text selection) ====== */}
+          {showFloatingToolbar && (
+            <div
+              className={cn(
+                "absolute z-50 flex items-center gap-0.5 px-1.5 py-1 rounded-lg shadow-xl border backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150",
+                "bg-white/95 border-slate-200 dark:bg-black/95 dark:border-white/10"
+              )}
+              style={{
+                top: floatingToolbarPos.top,
+                left: floatingToolbarPos.left,
+                transform: "translateX(-50%)",
+              }}
+              onMouseDown={(e) => e.preventDefault()} // prevent losing selection
+            >
+              {[
+                {
+                  icon: Bold,
+                  action: () => document.execCommand("bold"),
+                  title: "Bold",
+                },
+                {
+                  icon: Italic,
+                  action: () => document.execCommand("italic"),
+                  title: "Italic",
+                },
+                {
+                  icon: Underline,
+                  action: () => document.execCommand("underline"),
+                  title: "Underline",
+                },
+                {
+                  icon: Strikethrough,
+                  action: () => document.execCommand("strikeThrough"),
+                  title: "Strikethrough",
+                },
+                {
+                  icon: Link,
+                  action: () => {
+                    const url = prompt("Enter URL:");
+                    if (url) document.execCommand("createLink", false, url);
+                  },
+                  title: "Link",
+                },
+                {
+                  icon: Code2,
+                  action: () => {
+                    const sel = window.getSelection();
+                    if (sel && sel.rangeCount > 0) {
+                      const range = sel.getRangeAt(0);
+                      const code = document.createElement("code");
+                      code.className = "bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white px-1.5 py-0.5 rounded-md font-mono text-[0.9em]";
+                      code.style.borderRadius = "4px";
+                      code.style.fontFamily =
+                        "'JetBrains Mono', 'Fira Code', monospace";
+                      code.style.fontSize = "0.9em";
+                      range.surroundContents(code);
+                    }
+                  },
+                  title: "Inline Code",
+                },
+              ].map((tool, i) => (
+                <Button
+                  key={i}
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-sm"
+                  title={tool.title}
+                  onClick={() => {
+                    tool.action();
+                    setTimeout(() => {
+                      if (editorRef.current) {
+                        setContent(editorRef.current.innerHTML);
+                        isLocalChange.current = true;
+                      }
+                    }, 0);
+                  }}
+                >
+                  <tool.icon
+                    className={cn("h-3.5 w-3.5", "text-slate-500 dark:text-slate-400")}
+                  />
+                </Button>
+              ))}
+
+              {/* Inline Font selector in floating toolbar */}
+              <div
+                className={cn(
+                  "h-4 w-[1px] mx-0.5",
+                  "bg-slate-200 dark:bg-white/20"
+                )}
+              />
+              <Select
+                onValueChange={(value) => {
+                  document.execCommand("fontName", false, value);
+                  setTimeout(() => {
+                    if (editorRef.current) {
+                      setContent(editorRef.current.innerHTML);
+                      isLocalChange.current = true;
+                    }
+                  }, 0);
+                }}
+              >
+                <SelectTrigger className="h-7 w-[80px] text-[10px] border-0 bg-transparent focus:ring-0 px-1.5">
+                  <SelectValue placeholder="Font" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FONT_OPTIONS.map((font) => (
+                    <SelectItem
+                      key={font.value}
+                      value={font.value}
+                      style={{ fontFamily: font.value }}
+                    >
+                      {font.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* ====== SLASH COMMAND MENU ====== */}
+          {showSlashMenu && (
+            <div
+              className={cn(
+                "absolute z-50 w-72 rounded-lg shadow-2xl overflow-hidden border animate-in fade-in zoom-in-95 duration-100",
+                "bg-white dark:bg-black border-slate-200 dark:border-white/10"
+              )}
+              style={{
+                top: slashMenuPos.top,
+                left: slashMenuPos.left,
+              }}
+            >
+              <div className="px-3 py-2 text-xs font-semibold opacity-50 uppercase tracking-wider border-b">
+                Block / Command
+              </div>
+              <div className="max-h-[300px] overflow-y-auto py-1">
+                {filteredCommands.length > 0 ? (
+                  filteredCommands.map((cmd, index) => (
+                    <button
+                      key={cmd.label}
+                      onClick={() => executeSlashCommand(cmd)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      className={cn(
+                        "w-full px-3 py-2 text-left flex items-center gap-3 transition-colors",
+                        index === slashSelectedIndex
+                          ? "bg-slate-100 dark:bg-white/10 text-indigo-600 dark:text-indigo-400"
+                          : "bg-transparent text-slate-700 dark:text-slate-300"
+                      )}
+                    >
+                      <div className="p-1 rounded border opacity-70">
+                        <cmd.icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {cmd.label}
+                          </span>
+                          {cmd.shortcut && slashFilter && (
+                            <span className="text-[10px] uppercase bg-indigo-500/20 px-1 rounded text-indigo-500">
+                              /{cmd.shortcut}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs opacity-50">
+                          {cmd.description}
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-3 text-sm opacity-50 text-center">
+                    No commands found
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

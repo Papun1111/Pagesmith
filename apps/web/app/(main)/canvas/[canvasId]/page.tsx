@@ -110,9 +110,9 @@ export default function CanvasPage() {
   }
 
   return (
-    <div style={{ fontFamily: "'Poppins', sans-serif" }} className="flex flex-col h-screen bg-[#F0F0F0] text-[#111111] dark:bg-[#1a1a1a] dark:text-white">
+    <div style={{ fontFamily: "'Poppins', sans-serif" }} className="flex flex-col h-[100dvh] overflow-hidden bg-slate-50 text-slate-950 dark:bg-black dark:text-slate-50 transition-colors duration-300">
       {/* Header with responsive stacking */}
-      <header className="flex-shrink-0 p-3 md:p-4 border-b border-black dark:border-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+      <header className="flex-shrink-0 p-3 md:p-4 border-b border-slate-200 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white/50 dark:bg-black/50 backdrop-blur-xl z-10 transition-colors">
         <Toolbar canvas={canvas} onCanvasUpdate={onCanvasUpdate} />
         <CollaborationAvatars collaborators={canvas.collaborators} />
       </header>
@@ -120,10 +120,10 @@ export default function CanvasPage() {
       {/* Resizable panel group with dynamic direction */}
       <ResizablePanelGroup 
         direction={isMobile ? "vertical" : "horizontal"} 
-        className="flex-grow dark:bg-[#1a1a1a]"
+        className="flex-grow dark:bg-black transition-colors"
       >
         <ResizablePanel defaultSize={isMobile ? 65 : 75}>
-          <main className="h-full overflow-y-auto p-2">
+          <main className="h-full overflow-y-auto w-full bg-white dark:bg-black no-scrollbar transition-colors">
             <Editor canvasId={canvas._id} initialContent={canvas.content} />
           </main>
         </ResizablePanel>
@@ -132,10 +132,10 @@ export default function CanvasPage() {
         <ResizableHandle
           withHandle
           className={cn(
-            "bg-transparent hover:bg-black/10 dark:hover:bg-white/10 transition-colors",
+            "bg-slate-200/50 hover:bg-indigo-500/20 dark:bg-white/5 dark:hover:bg-indigo-500/30 transition-colors backdrop-blur-sm border-0",
             isMobile
-              ? "border-y-2 h-4" // Horizontal handle for vertical layout
-              : "border-x-2 w-4"  // Vertical handle for horizontal layout
+              ? "h-2" // Horizontal handle for vertical layout
+              : "w-2"  // Vertical handle for horizontal layout
           )}
         />
         
