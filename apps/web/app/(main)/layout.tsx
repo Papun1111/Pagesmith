@@ -13,16 +13,16 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Sidebar - fixed on desktop, potentially hidden on mobile */}
+    <div className="flex h-screen bg-[#F0F0F0] dark:bg-[#111111]">
+      {/* Sidebar - sticky on desktop, hidden on mobile (Sheet in Header) */}
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex flex-col flex-1 overflow-hidden min-w-0">
         {/* Header */}
         <Header />
 
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-[#1a1a1a]">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[#F0F0F0] dark:bg-[#111111]">
           {children}
         </main>
       </div>
