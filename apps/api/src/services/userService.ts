@@ -102,7 +102,7 @@ export const findUserByClerkId = async (clerkId: string) => {
         lastName: clerkUser.lastName,
         imageUrl: clerkUser.imageUrl,
       });
-      logger.info(`Successfully created user ${clerkId} just-in-time via Clerk API.`);
+      logger.info(`Successfully created user ${clerkId} just-in-time.`);
     } catch (clerkError: any) {
       logger.warn(`Clerk API lookup failed for ${clerkId}: ${clerkError.message}. Creating minimal user.`);
       // Fallback: create a minimal user document so the app doesn't crash.
@@ -118,6 +118,15 @@ export const findUserByClerkId = async (clerkId: string) => {
         }
       }
     }
+  }
+
+  // --- Special access enforcement: ensure special emails ALWAYS have hashira ---
+  // This runs on every lookup, so even if the user was created before being
+  // added to the special list, they get upgraded on their next API call.
+  if (user && isSpecialAccessEmail(user.email) && user.plan !== 'hashira') {
+    user.plan = 'hashira';
+    await user.save();
+    logger.info(`Auto-upgraded special access user ${user.email} to hashira plan.`);
   }
 
   return user;

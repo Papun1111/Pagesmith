@@ -15,6 +15,7 @@ import { globalErrorHandler } from './middleware/errorHandler.js';
 // --- Route Handlers ---
 import apiRoutes from './routes/index.js';
 import userRoutes from './routes/userRoutes.js';
+import { clerkWebhookHandler } from './controllers/userController.js';
 
 // --- 1. Initial Server Setup ---
 connectDB(); 
@@ -37,7 +38,8 @@ app.use(cors({
 }));
 
 // --- 2. Webhook Route Configuration ---
-app.use('/api/webhooks/clerk', express.raw({ type: 'application/json' }), userRoutes);
+// Mount the webhook handler directly so the exact URL is POST /api/webhooks/clerk
+app.post('/api/webhooks/clerk', express.raw({ type: 'application/json' }), clerkWebhookHandler);
 
 // --- 3. Global JSON Body Parser ---
 app.use(express.json());
