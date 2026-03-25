@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
     const token = await getToken();
     const { plan } = await req.json();
 
-    // FIX: The BACKEND_API_URL environment variable already includes '/api',
-    // so it has been removed from this path to prevent duplication.
-    const backendResponse = await fetch(`${BACKEND_API_URL}/billing/create-order`, {
+    // BACKEND_API_URL is http://localhost:8080 (no /api suffix).
+    // The backend mounts routes at /api/billing/*.
+    const backendResponse = await fetch(`${BACKEND_API_URL}/api/billing/create-order`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

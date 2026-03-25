@@ -15,6 +15,8 @@ export interface IUser extends Document {
   email: string; // User's email address, synced from Clerk
   plan: Plan; // The user's current subscription plan
   stripeCustomerId?: string; // The customer ID from Stripe for managing subscriptions
+  razorpayOrderId?: string; // The most recent Razorpay order ID
+  razorpayPaymentId?: string; // The most recent Razorpay payment ID
 }
 
 const UserSchema: Schema = new Schema(
@@ -43,6 +45,16 @@ const UserSchema: Schema = new Schema(
       type: String,
       unique: true,
       sparse: true, // Allows multiple null values, but unique if a value exists
+    },
+
+    razorpayOrderId: {
+      type: String,
+      sparse: true,
+    },
+
+    razorpayPaymentId: {
+      type: String,
+      sparse: true,
     },
   },
   {

@@ -4,15 +4,14 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { PricingCard } from '@/components/features/billing/PricingCard';
 import { apiClient } from '@/lib/api';
-import type { PricingTier, UserProfile } from '@/types';
+import type { UserProfile } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // --- Pricing Data ---
-const pricingTiers: Omit<PricingTier, 'isCurrentPlan'>[] = [
+const pricingTiers = [
   {
     id: 'free',
     name: 'Free',
-    priceId: undefined, // Free plan has no price ID
     priceMonthly: 0,
     description: 'For individuals starting out. Get a feel for our platform.',
     features: ['2 Canvases', '1 Collaborator per Canvas', 'Basic AI Assistant (5 queries/day)'],
@@ -20,7 +19,6 @@ const pricingTiers: Omit<PricingTier, 'isCurrentPlan'>[] = [
   {
     id: 'demon',
     name: 'Demon',
-    priceId: process.env.NEXT_PUBLIC_STRIPE_DEMON_PRICE_ID || 'price_demon_placeholder',
     priceMonthly: 10,
     description: 'For power users and small teams who need more.',
     features: [
@@ -34,7 +32,6 @@ const pricingTiers: Omit<PricingTier, 'isCurrentPlan'>[] = [
   {
     id: 'hashira',
     name: 'Hashira',
-    priceId: process.env.NEXT_PUBLIC_STRIPE_HASHIRA_PRICE_ID || 'price_hashira_placeholder',
     priceMonthly: 25,
     description: 'For large teams and organizations requiring advanced features.',
     features: [
@@ -103,10 +100,8 @@ export default function PricingPage() {
         {pricingTiers.map((tier) => (
           <PricingCard
             key={tier.id}
-            tier={{
-              ...tier,
-              isCurrentPlan: currentPlan === tier.id,
-            }}
+            tier={tier}
+            currentPlan={currentPlan}
           />
         ))}
       </div>

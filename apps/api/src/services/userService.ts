@@ -2,12 +2,7 @@ import { clerkClient } from '@clerk/express';
 import User from '../models/User.js';
 import { logger } from '../utils/logger.js';
 import { ApiError } from '../utils/apiError.js';
-
-// --- Define the list of special emails that get a free Hashira plan ---
-const specialAccessEmails = [
-  'gohanmohapatra@gmail.com',
-  'papunmohapatra1111@gmail.com'
-];
+import { isSpecialAccessEmail } from '../config/specialAccess.js';
 
 interface UserData {
   clerkId: string;
@@ -19,7 +14,12 @@ interface UserData {
 
 /**
  * Creates a new user or updates an existing one in the database.
- * Now includes special logic to grant the Hashira plan to specific emails.
+ * 
+ * Plan logic:
+ * - New users get 'free' by default (via schema default)
+ * - Special email users ALWAYS get 'hashira' (on creation AND every update)
+ * - For regular existing users, the plan is NEVER changed by webhooks
+ * - Only the billing service can change plans for regular existing users
  */
 export const createOrUpdateUser = async (userData: UserData) => {
   if (!userData.clerkId) {
@@ -33,30 +33,46 @@ export const createOrUpdateUser = async (userData: UserData) => {
       Object.entries(updateData).filter(([, value]) => value !== undefined)
     );
 
-    // --- Check if the user's email is in the special access list ---
-    let planOverride = {};
-    if (userData.email && specialAccessEmails.includes(userData.email)) {
-      planOverride = { plan: 'hashira' };
-      logger.info(`Granting special Hashira access to user: ${userData.email}`);
+    const isSpecial = isSpecialAccessEmail(userData.email);
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ clerkId });
+
+    if (existingUser) {
+      // --- Existing user ---
+      // Special emails: ALWAYS ensure they have hashira (even if manually changed)
+      // Regular users: NEVER touch their plan (prevents webhook from overwriting paid plans)
+      const updatePayload: Record<string, any> = { ...cleanUpdateData };
+
+      if (isSpecial && existingUser.plan !== 'hashira') {
+        updatePayload.plan = 'hashira';
+        logger.info(`Restoring Hashira access for special user: ${userData.email}`);
+      }
+
+      const user = await User.findOneAndUpdate(
+        { clerkId },
+        { $set: updatePayload },
+        { new: true, runValidators: true }
+      );
+      logger.info(`User updated for clerkId: ${clerkId} (plan: ${user?.plan})`);
+      return user;
+    } else {
+      // --- New user: determine the initial plan ---
+      const initialPlan = isSpecial ? 'hashira' : 'free';
+
+      if (isSpecial) {
+        logger.info(`Granting special Hashira access to new user: ${userData.email}`);
+      }
+
+      const user = await User.create({
+        clerkId,
+        ...cleanUpdateData,
+        plan: initialPlan,
+      });
+
+      logger.info(`New user created for clerkId: ${clerkId} with plan: ${initialPlan}`);
+      return user;
     }
-
-    const user = await User.findOneAndUpdate(
-      { clerkId: clerkId },
-      // Merge the user data with the plan override.
-      // The plan will default to 'free' unless overridden here.
-      { 
-        $set: {
-            ...cleanUpdateData,
-            ...planOverride
-        },
-        // Only set plan to 'free' on initial document creation if it's not being overridden.
-        $setOnInsert: { plan: 'free' } 
-      },
-      { new: true, upsert: true, runValidators: true }
-    );
-
-    logger.info(`User upserted successfully for clerkId: ${clerkId}`);
-    return user;
   } catch (error) {
     logger.error(`Error in createOrUpdateUser for clerkId ${userData.clerkId}:`, error);
     throw new ApiError(500, 'Database operation failed while creating or updating user.');
@@ -86,13 +102,23 @@ export const findUserByClerkId = async (clerkId: string) => {
         lastName: clerkUser.lastName,
         imageUrl: clerkUser.imageUrl,
       });
-      logger.info(`Successfully created user ${clerkId} just-in-time.`);
-    } catch (error: any) {
-        logger.error(`Failed to fetch or create user from Clerk API for clerkId ${clerkId}:`, error.errors || error.message || error);
-        throw new ApiError(404, 'User could not be verified with the authentication provider.'); 
+      logger.info(`Successfully created user ${clerkId} just-in-time via Clerk API.`);
+    } catch (clerkError: any) {
+      logger.warn(`Clerk API lookup failed for ${clerkId}: ${clerkError.message}. Creating minimal user.`);
+      // Fallback: create a minimal user document so the app doesn't crash.
+      // The user's profile will be enriched on their next webhook event.
+      try {
+        user = await User.create({ clerkId, email: `${clerkId}@placeholder.local`, plan: 'free' });
+        logger.info(`Created minimal fallback user for ${clerkId}.`);
+      } catch (createError: any) {
+        // If even this fails (e.g. duplicate key), try to find again
+        user = await User.findOne({ clerkId });
+        if (!user) {
+          throw new ApiError(500, 'Failed to create or find user after multiple attempts.');
+        }
+      }
     }
   }
 
   return user;
 };
-

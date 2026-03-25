@@ -4,6 +4,7 @@ import { findUserByClerkId } from './userService.js';
 import { ApiError } from '../utils/apiError.js';
 import { logger } from '../utils/logger.js';
 import User from '../models/User.js';
+import { redisClient } from '../config/redis.js';
 
 // Initialize Razorpay client
 const razorpay = new Razorpay({
@@ -28,13 +29,12 @@ export const createRazorpayOrder = async (clerkId: string, plan: 'demon' | 'hash
     throw new ApiError(400, "Invalid plan specified.");
   }
 
-  // FIX: Generate a shorter, random receipt ID to comply with Razorpay's 40-character limit.
-  // This creates a highly unique ID that is well within the length constraint.
+  // Generate a shorter, random receipt ID to comply with Razorpay's 40-character limit.
   const receiptId = `rcpt_${crypto.randomBytes(14).toString('hex')}`;
 
   const options = {
     amount: amount, // Amount in paise
-    currency: "INR", // Or your desired currency
+    currency: "INR",
     receipt: receiptId,
     notes: {
       clerkId,
@@ -54,12 +54,26 @@ export const createRazorpayOrder = async (clerkId: string, plan: 'demon' | 'hash
 
 /**
  * Verifies the payment signature from Razorpay to confirm a successful transaction.
+ * Includes idempotency check to prevent duplicate processing.
  */
 export const verifyRazorpayPayment = async (
     razorpay_order_id: string,
     razorpay_payment_id: string,
     razorpay_signature: string
 ) => {
+    // --- Input validation ---
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        throw new ApiError(400, 'Missing required payment verification fields.');
+    }
+
+    // --- Idempotency check: if this order was already processed, return success ---
+    const existingUser = await User.findOne({ razorpayOrderId: razorpay_order_id });
+    if (existingUser) {
+        logger.info(`Idempotency: Order ${razorpay_order_id} already processed for user ${existingUser.clerkId}. Skipping.`);
+        return { success: true, plan: existingUser.plan, alreadyProcessed: true };
+    }
+
+    // --- Signature verification ---
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
 
     const expectedSignature = crypto
@@ -79,8 +93,8 @@ export const verifyRazorpayPayment = async (
         throw new ApiError(400, 'Order is missing necessary user or plan information.');
     }
 
-    // Update user's plan in the database
-    await User.findOneAndUpdate(
+    // --- Update user's plan in the database ---
+    const updatedUser = await User.findOneAndUpdate(
         { clerkId },
         {
             plan,
@@ -89,8 +103,20 @@ export const verifyRazorpayPayment = async (
         },
         { new: true }
     );
+
+    if (!updatedUser) {
+        throw new ApiError(404, 'User not found for this payment.');
+    }
+
+    // --- Invalidate the rate limiter cache so new plan limits apply immediately ---
+    try {
+        await redisClient.del(`user-plan:${clerkId}`);
+        logger.info(`Rate limiter cache invalidated for user ${clerkId}.`);
+    } catch (cacheError) {
+        // Non-fatal: cache will expire naturally in 5 minutes
+        logger.warn(`Failed to invalidate rate limiter cache for user ${clerkId}:`, cacheError);
+    }
     
-    logger.info(`Payment verified and plan updated for user ${clerkId} to ${plan}.`);
+    logger.info(`Payment verified and plan updated for user ${clerkId} to ${plan}. Order: ${razorpay_order_id}, Payment: ${razorpay_payment_id}`);
     return { success: true, plan };
 };
-

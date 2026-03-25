@@ -42,12 +42,10 @@ export interface UserProfile {
 }
 
 export interface PricingTier {
-  id: SubscriptionPlan;
+  id: string;
   name: string;
-  priceId?: string; 
   priceMonthly: number;
   description: string;
   features: string[];
-  isCurrentPlan?: boolean; 
   isMostPopular?: boolean; 
 }

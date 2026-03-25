@@ -1,25 +1,75 @@
 import Canvas, { type ICanvas, AccessTypes } from '../models/Canvas.js';
+import User from '../models/User.js';
 import { logger } from '../utils/logger.js';
 import { ApiError } from '../utils/apiError.js';
 
 // Define the AccessType locally from the imported runtime object.
-// This resolves the import error as we no longer need to import the type directly.
 type AccessType = typeof AccessTypes[keyof typeof AccessTypes];
+
+/* ------------------------------------------------------------------ */
+/*  Plan-based limits                                                  */
+/* ------------------------------------------------------------------ */
+
+const PLAN_LIMITS = {
+  free: {
+    maxCanvases: 2,
+    maxCollaboratorsPerCanvas: 1,
+  },
+  demon: {
+    maxCanvases: Infinity,
+    maxCollaboratorsPerCanvas: 5,
+  },
+  hashira: {
+    maxCanvases: Infinity,
+    maxCollaboratorsPerCanvas: Infinity,
+  },
+} as const;
+
+type PlanKey = keyof typeof PLAN_LIMITS;
+
+/**
+ * Gets the user's plan from the database. Returns 'free' if not found.
+ */
+async function getUserPlan(clerkId: string): Promise<PlanKey> {
+  const user = await User.findOne({ clerkId }).select('plan').lean();
+  const plan = user?.plan || 'free';
+  return plan as PlanKey;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Canvas CRUD                                                        */
+/* ------------------------------------------------------------------ */
 
 /**
  * Creates a new canvas for a given user.
+ * Enforces plan-based canvas creation limits.
  */
 export const createNewCanvas = async (ownerId: string, title?: string): Promise<ICanvas> => {
   if (!ownerId) {
     throw new ApiError(400, 'An owner ID is required to create a canvas.');
   }
+
+  // --- Plan enforcement: check canvas count limit ---
+  const userPlan = await getUserPlan(ownerId);
+  const limits = PLAN_LIMITS[userPlan];
+  
+  if (limits.maxCanvases !== Infinity) {
+    const currentCount = await Canvas.countDocuments({ ownerId });
+    if (currentCount >= limits.maxCanvases) {
+      throw new ApiError(
+        403,
+        `Your ${userPlan} plan allows a maximum of ${limits.maxCanvases} canvases. Please upgrade your plan to create more.`
+      );
+    }
+  }
+
   try {
     const newCanvas = new Canvas({
       ownerId,
       title: title || 'Untitled Canvas',
     });
     await newCanvas.save();
-    logger.info(`New canvas created with ID: ${newCanvas._id} by user: ${ownerId}`);
+    logger.info(`New canvas created with ID: ${newCanvas._id} by user: ${ownerId} (plan: ${userPlan})`);
     return newCanvas;
   } catch (error) {
     logger.error(`Error creating canvas for user ${ownerId}:`, error);
@@ -56,7 +106,7 @@ export const findCanvasById = async (canvasId: string, userId: string): Promise<
  * Updates the title of a canvas, checking for user permissions.
  */
 export const updateCanvasTitle = async (canvasId: string, userId: string, title: string): Promise<ICanvas> => {
-    const canvas = await findCanvasById(canvasId, userId); // Permission check is built-in
+    const canvas = await findCanvasById(canvasId, userId);
     const hasWritePermission = canvas.ownerId === userId || canvas.collaborators.some(c => c.userId === userId && c.accessType === AccessTypes.WRITE);
 
     if (!hasWritePermission) {
@@ -71,7 +121,7 @@ export const updateCanvasTitle = async (canvasId: string, userId: string, title:
  * Updates the content of a canvas, checking for user permissions.
  */
 export const updateCanvasContent = async (canvasId: string, userId: string, content: string): Promise<ICanvas> => {
-    const canvas = await findCanvasById(canvasId, userId); // Permission check is built-in
+    const canvas = await findCanvasById(canvasId, userId);
     const hasWritePermission = canvas.ownerId === userId || canvas.collaborators.some(c => c.userId === userId && c.accessType === AccessTypes.WRITE);
 
     if (!hasWritePermission) {
@@ -84,6 +134,7 @@ export const updateCanvasContent = async (canvasId: string, userId: string, cont
 
 /**
  * Adds a collaborator to a canvas. Only the owner can do this.
+ * Enforces plan-based collaborator limits.
  */
 export const addCollaborator = async (canvasId: string, ownerId: string, collaboratorId: string, accessType: AccessType): Promise<ICanvas> => {
     const canvas = await Canvas.findById(canvasId);
@@ -91,14 +142,28 @@ export const addCollaborator = async (canvasId: string, ownerId: string, collabo
     if (canvas.ownerId !== ownerId) throw new ApiError(403, 'Only the owner can add collaborators.');
     if (ownerId === collaboratorId) throw new ApiError(400, 'You cannot add yourself as a collaborator.');
 
-    // Check if collaborator already exists
+    // Check if collaborator already exists (updating access doesn't count toward limit)
     const existingCollaborator = canvas.collaborators.find(c => c.userId === collaboratorId);
-    if (existingCollaborator) {
-        // If they exist, just update their access type
-        existingCollaborator.accessType = accessType;
+
+    if (!existingCollaborator) {
+      // --- Plan enforcement: check collaborator count limit ---
+      const userPlan = await getUserPlan(ownerId);
+      const limits = PLAN_LIMITS[userPlan];
+
+      if (limits.maxCollaboratorsPerCanvas !== Infinity) {
+        const currentCollabCount = canvas.collaborators.length;
+        if (currentCollabCount >= limits.maxCollaboratorsPerCanvas) {
+          throw new ApiError(
+            403,
+            `Your ${userPlan} plan allows a maximum of ${limits.maxCollaboratorsPerCanvas} collaborator(s) per canvas. Please upgrade your plan to add more.`
+          );
+        }
+      }
+
+      canvas.collaborators.push({ userId: collaboratorId, accessType });
     } else {
-        // Otherwise, add them to the array
-        canvas.collaborators.push({ userId: collaboratorId, accessType });
+      // If they exist, just update their access type
+      existingCollaborator.accessType = accessType;
     }
 
     await canvas.save();
@@ -132,5 +197,3 @@ export const deleteCanvas = async (canvasId: string, ownerId: string): Promise<v
     await Canvas.findByIdAndDelete(canvasId);
     logger.info(`Canvas with ID: ${canvasId} was deleted by owner: ${ownerId}`);
 };
-
-

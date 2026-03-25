@@ -3,12 +3,7 @@ import { getAuth } from '@clerk/express';
 import { redisClient } from '../config/redis.js';
 import User from '../models/User.js';
 import { logger } from '../utils/logger.js';
-
-// --- NEW: Define the list of emails that should bypass rate limiting ---
-const specialAccessEmails = [
-  'gohanmohapatra@gmail.com',
-  'dipunmohapatra.69@gmail.com'
-];
+import { isSpecialAccessEmail } from '../config/specialAccess.js';
 
 const PLAN_LIMITS = {
   free: {
@@ -44,15 +39,23 @@ export const planBasedRateLimiter = async (
       // Fetch user from our database to get their plan and email.
       const user = await User.findOne({ clerkId: userId }).select('plan email');
 
-      // --- NEW: Check if the user's email grants special access ---
-      // If it does, bypass all rate limiting logic and proceed.
-      if (user?.email && specialAccessEmails.includes(user.email)) {
-        logger.info(`Bypassing rate limit for special access user: ${user.email}`);
+      // Check if the user's email grants special access — bypass all rate limiting.
+      if (isSpecialAccessEmail(user?.email)) {
+        logger.info(`Bypassing rate limit for special access user: ${user?.email}`);
         return next();
       }
       
       userPlan = user?.plan || 'free';
       await redisClient.set(userCacheKey, userPlan, { EX: 300 });
+    }
+
+    // If the cached plan is 'hashira', also check if it's a special email
+    // (special emails should always bypass, even from cache)
+    if (userPlan === 'hashira') {
+      const user = await User.findOne({ clerkId: userId }).select('email').lean();
+      if (isSpecialAccessEmail(user?.email)) {
+        return next();
+      }
     }
 
     const limits = PLAN_LIMITS[userPlan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
