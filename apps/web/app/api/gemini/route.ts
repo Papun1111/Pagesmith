@@ -25,8 +25,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Securely forward the request to your backend service.
-    // The full URL should be http://localhost:8080/api/ai/generate
-    const backendResponse = await fetch(`${BACKEND_API_URL}/api/ai/generate`, {
+    // The full URL should be http://localhost:8080/api/ai/generate    // Strip trailing /api to prevent double /api/api/ in production
+    const baseUrl = BACKEND_API_URL.replace(/\/api\/?$/, '');
+    const backendResponse = await fetch(`${baseUrl}/api/ai/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

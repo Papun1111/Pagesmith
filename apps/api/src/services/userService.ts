@@ -33,10 +33,26 @@ export const createOrUpdateUser = async (userData: UserData) => {
       Object.entries(updateData).filter(([, value]) => value !== undefined)
     );
 
+    // Ensure email is always present, as it is required by the Mongoose schema.
+    // If Clerk didn't provide one (e.g. phone number signup), generate a placeholder.
+    if (!cleanUpdateData.email) {
+      cleanUpdateData.email = `${clerkId}@placeholder.local`;
+      userData.email = cleanUpdateData.email;
+    }
+
     const isSpecial = isSpecialAccessEmail(userData.email);
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ clerkId });
+    // Check if user already exists (by clerkId OR email)
+    // Finding by email handles cases where a user deletes their Clerk account
+    // and re-creates it with the same email, but gets a new clerkId.
+    let existingUser = await User.findOne({ clerkId });
+    
+    if (!existingUser && cleanUpdateData.email) {
+      existingUser = await User.findOne({ email: cleanUpdateData.email });
+      if (existingUser) {
+        logger.info(`Found existing user by email ${cleanUpdateData.email}. Updating clerkId from ${existingUser.clerkId} to ${clerkId}.`);
+      }
+    }
 
     if (existingUser) {
       // --- Existing user ---
@@ -49,8 +65,12 @@ export const createOrUpdateUser = async (userData: UserData) => {
         logger.info(`Restoring Hashira access for special user: ${userData.email}`);
       }
 
+      // We must search by the existingUser's clerkId (in case it changed)
+      // and explicitly step the clerkId to the new one in the update payload.
+      updatePayload.clerkId = clerkId;
+
       const user = await User.findOneAndUpdate(
-        { clerkId },
+        { clerkId: existingUser.clerkId },
         { $set: updatePayload },
         { new: true, runValidators: true }
       );
